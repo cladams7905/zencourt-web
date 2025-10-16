@@ -62,26 +62,29 @@ export function ImagePreviewModal({
   const [isZoomed, setIsZoomed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const hasPrevious = currentIndex > 0;
-  const hasNext = currentIndex < allImages.length - 1;
-
-  // Navigate to previous image
+  // Navigate to previous image (with looping)
   const handlePrevious = useCallback(() => {
-    if (hasPrevious && onNavigate) {
+    if (onNavigate) {
       setImageLoaded(false);
       setIsZoomed(false);
-      onNavigate(currentIndex - 1);
+      // Loop to last image if at the beginning
+      const newIndex =
+        currentIndex > 0 ? currentIndex - 1 : allImages.length - 1;
+      onNavigate(newIndex);
     }
-  }, [hasPrevious, currentIndex, onNavigate]);
+  }, [currentIndex, allImages.length, onNavigate]);
 
-  // Navigate to next image
+  // Navigate to next image (with looping)
   const handleNext = useCallback(() => {
-    if (hasNext && onNavigate) {
+    if (onNavigate) {
       setImageLoaded(false);
       setIsZoomed(false);
-      onNavigate(currentIndex + 1);
+      // Loop to first image if at the end
+      const newIndex =
+        currentIndex < allImages.length - 1 ? currentIndex + 1 : 0;
+      onNavigate(newIndex);
     }
-  }, [hasNext, currentIndex, onNavigate]);
+  }, [currentIndex, allImages.length, onNavigate]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -141,43 +144,43 @@ export function ImagePreviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black bg-opacity-95 flex items-center justify-center"
+      className="fixed inset-0 !z-[60] bg-black bg-opacity-95 flex items-center justify-center"
       onClick={onClose}
     >
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 p-2 text-white hover:bg-white hover:bg-opacity-10 rounded-full transition-colors z-10"
+        className="absolute top-4 right-4 p-2 text-white hover:bg-white hover:text-black hover:bg-opacity/10 rounded-full transition-colors z-10"
         aria-label="Close preview"
       >
         <X className="w-6 h-6" />
       </button>
 
       {/* Navigation Buttons */}
-      {hasPrevious && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handlePrevious();
-          }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white hover:bg-white hover:bg-opacity-10 rounded-full transition-colors z-10"
-          aria-label="Previous image"
-        >
-          <ChevronLeft className="w-8 h-8" />
-        </button>
-      )}
+      {allImages.length > 1 && (
+        <>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevious();
+            }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white hover:bg-white hover:text-black hover:bg-opacity/10 rounded-full transition-colors z-10"
+            aria-label="Previous image"
+          >
+            <ChevronLeft className="w-8 h-8" />
+          </button>
 
-      {hasNext && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleNext();
-          }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white hover:bg-white hover:bg-opacity-10 rounded-full transition-colors z-10"
-          aria-label="Next image"
-        >
-          <ChevronRight className="w-8 h-8" />
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNext();
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white hover:bg-white hover:text-black hover:bg-opacity/10 rounded-full transition-colors z-10"
+            aria-label="Next image"
+          >
+            <ChevronRight className="w-8 h-8" />
+          </button>
+        </>
       )}
 
       {/* Image Counter */}
@@ -192,7 +195,7 @@ export function ImagePreviewModal({
             e.stopPropagation();
             setIsZoomed(!isZoomed);
           }}
-          className="p-2 text-white hover:bg-white hover:bg-opacity-10 rounded transition-colors"
+          className="p-2 text-white hover:bg-white hover:bg-opacity/10 hover:text-black rounded transition-colors"
           aria-label={isZoomed ? "Zoom out" : "Zoom in"}
         >
           {isZoomed ? (
@@ -206,7 +209,7 @@ export function ImagePreviewModal({
             e.stopPropagation();
             handleDownload();
           }}
-          className="p-2 text-white hover:bg-white hover:bg-opacity-10 rounded transition-colors"
+          className="p-2 text-white hover:bg-white hover:text-black hover:bg-opacity/10 rounded transition-colors"
           aria-label="Download image"
         >
           <Download className="w-5 h-5" />
@@ -308,7 +311,7 @@ export function ImagePreviewModal({
                           (feature, index) => (
                             <span
                               key={index}
-                              className="px-2 py-1 bg-white bg-opacity-10 rounded text-xs"
+                              className="px-2 py-1 bg-white bg-opacity/10 rounded text-xs"
                             >
                               {feature}
                             </span>
@@ -322,22 +325,22 @@ export function ImagePreviewModal({
               {/* Keyboard Shortcuts */}
               <div className="hidden lg:block text-xs text-gray-400">
                 <div className="mb-1">
-                  <kbd className="px-2 py-1 bg-white bg-opacity-10 rounded">
+                  <kbd className="px-2 py-1 bg-white bg-opacity/10 rounded">
                     ESC
                   </kbd>{" "}
                   Close
                 </div>
                 <div className="mb-1">
-                  <kbd className="px-2 py-1 bg-white bg-opacity-10 rounded">
+                  <kbd className="px-2 py-1 bg-white bg-opacity/10 rounded">
                     ←
                   </kbd>
-                  <kbd className="px-2 py-1 bg-white bg-opacity-10 rounded ml-1">
+                  <kbd className="px-2 py-1 bg-white bg-opacity/10 rounded ml-1">
                     →
                   </kbd>{" "}
                   Navigate
                 </div>
                 <div>
-                  <kbd className="px-2 py-1 bg-white bg-opacity-10 rounded">
+                  <kbd className="px-2 py-1 bg-white bg-opacity/10 rounded">
                     Z
                   </kbd>{" "}
                   Zoom

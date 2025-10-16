@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +47,12 @@ export function UploadProjectModal({
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<ImageData | null>(null);
   const [isCategorizing, setIsCategorizing] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(isOpen);
+
+  // Sync external isOpen prop with internal state
+  useEffect(() => {
+    setInternalIsOpen(isOpen);
+  }, [isOpen]);
 
   const handleFilesSelected = async (files: File[]) => {
     setIsLoadingPreviews(true);
@@ -231,7 +237,15 @@ export function UploadProjectModal({
     const image = images.find((img) => img.id === imageId);
     if (image) {
       setPreviewImage(image);
+      // Close the upload modal when opening preview
+      setInternalIsOpen(false);
     }
+  };
+
+  const handlePreviewClose = () => {
+    setPreviewImage(null);
+    // Reopen the upload modal when preview closes
+    setInternalIsOpen(true);
   };
 
   const handleContinue = async () => {
@@ -278,7 +292,7 @@ export function UploadProjectModal({
     );
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={internalIsOpen} onOpenChange={onClose}>
       <DialogContent
         className={`max-w-4xl max-h-[90vh] overflow-y-auto ${
           (allUploadedOrError || isUploading) && "pb-0"
@@ -371,7 +385,7 @@ export function UploadProjectModal({
       {previewImage && (
         <ImagePreviewModal
           isOpen={!!previewImage}
-          onClose={() => setPreviewImage(null)}
+          onClose={handlePreviewClose}
           currentImage={{
             id: previewImage.id,
             file: previewImage.file,
