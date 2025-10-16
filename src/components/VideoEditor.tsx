@@ -1,10 +1,10 @@
-import { 
-  Play, 
-  Pause, 
-  Volume2, 
-  Maximize, 
-  Scissors, 
-  Type, 
+import {
+  Play,
+  Pause,
+  Volume2,
+  Maximize,
+  Scissors,
+  Type,
   Music,
   Video,
   LayoutGrid,
@@ -13,17 +13,44 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Switch } from "./ui/switch";
+import Image from "next/image";
 
 export function VideoEditor() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState<"vertical" | "landscape">("vertical");
+  const [aspectRatio, setAspectRatio] = useState<"vertical" | "landscape">(
+    "vertical"
+  );
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
 
   const scenes = [
-    { id: 1, name: "Exterior", duration: 8, thumbnail: "https://images.unsplash.com/photo-1560170412-0f7df0eb0fb1?w=200&q=80" },
-    { id: 2, name: "Living Room", duration: 12, thumbnail: "https://images.unsplash.com/photo-1671966550483-bed07f4c93b4?w=200&q=80" },
-    { id: 3, name: "Kitchen", duration: 10, thumbnail: "https://images.unsplash.com/photo-1546552229-7b16095d6904?w=200&q=80" },
-    { id: 4, name: "Bedroom", duration: 8, thumbnail: "https://images.unsplash.com/photo-1632060503164-790178d036b8?w=200&q=80" },
+    {
+      id: 1,
+      name: "Exterior",
+      duration: 8,
+      thumbnail:
+        "https://images.unsplash.com/photo-1560170412-0f7df0eb0fb1?w=200&q=80"
+    },
+    {
+      id: 2,
+      name: "Living Room",
+      duration: 12,
+      thumbnail:
+        "https://images.unsplash.com/photo-1671966550483-bed07f4c93b4?w=200&q=80"
+    },
+    {
+      id: 3,
+      name: "Kitchen",
+      duration: 10,
+      thumbnail:
+        "https://images.unsplash.com/photo-1546552229-7b16095d6904?w=200&q=80"
+    },
+    {
+      id: 4,
+      name: "Bedroom",
+      duration: 8,
+      thumbnail:
+        "https://images.unsplash.com/photo-1632060503164-790178d036b8?w=200&q=80"
+    }
   ];
 
   return (
@@ -35,7 +62,7 @@ export function VideoEditor() {
             Edit and customize your AI-generated walkthrough
           </p>
         </div>
-        
+
         {/* Aspect Ratio Toggle */}
         <div className="flex gap-1 sm:gap-2 bg-white rounded-lg p-1 border border-border w-full sm:w-auto">
           <button
@@ -70,17 +97,17 @@ export function VideoEditor() {
           <div className="flex justify-center mb-4">
             <div
               className={`bg-gradient-to-br from-[#d4c4b0] to-[#e8ddd3] rounded-xl relative overflow-hidden ${
-                aspectRatio === "vertical" 
-                  ? "aspect-[9/16] max-h-[400px] sm:max-h-[500px] lg:h-[600px]" 
+                aspectRatio === "vertical"
+                  ? "aspect-[9/16] max-h-[400px] sm:max-h-[500px] lg:h-[600px]"
                   : "aspect-video w-full"
               }`}
             >
-              <img
+              <Image
                 src="https://images.unsplash.com/photo-1671966550483-bed07f4c93b4?w=1200&q=80"
                 alt="Video preview"
                 className="w-full h-full object-cover"
               />
-              
+
               {/* Subtitle Preview */}
               {subtitlesEnabled && (
                 <div className="absolute bottom-20 left-4 right-4 flex justify-center">
@@ -89,7 +116,7 @@ export function VideoEditor() {
                   </div>
                 </div>
               )}
-              
+
               <div className="absolute inset-0 flex items-center justify-center">
                 <button
                   onClick={() => setIsPlaying(!isPlaying)}
@@ -102,7 +129,7 @@ export function VideoEditor() {
                   )}
                 </button>
               </div>
-              
+
               <div className="absolute bottom-4 left-4 right-4 flex items-center gap-4 text-white">
                 <div className="flex items-center gap-2">
                   <Volume2 size={20} />
@@ -122,21 +149,33 @@ export function VideoEditor() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base sm:text-lg">Timeline</h3>
               <div className="flex gap-1 sm:gap-2">
-                <button className="p-1.5 sm:p-2 hover:bg-secondary rounded-lg transition-colors" title="Split clip">
+                <button
+                  className="p-1.5 sm:p-2 hover:bg-secondary rounded-lg transition-colors"
+                  title="Split clip"
+                >
                   <Scissors size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </button>
-                <button className="p-1.5 sm:p-2 hover:bg-secondary rounded-lg transition-colors" title="Add text">
+                <button
+                  className="p-1.5 sm:p-2 hover:bg-secondary rounded-lg transition-colors"
+                  title="Add text"
+                >
                   <Type size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </button>
-                <button className="p-1.5 sm:p-2 hover:bg-secondary rounded-lg transition-colors" title="Add subtitles">
+                <button
+                  className="p-1.5 sm:p-2 hover:bg-secondary rounded-lg transition-colors"
+                  title="Add subtitles"
+                >
                   <Subtitles size={16} className="sm:w-[18px] sm:h-[18px]" />
                 </button>
-                <button className="p-1.5 sm:p-2 hover:bg-secondary rounded-lg transition-colors hidden sm:block" title="Add music">
+                <button
+                  className="p-1.5 sm:p-2 hover:bg-secondary rounded-lg transition-colors hidden sm:block"
+                  title="Add music"
+                >
                   <Music size={18} />
                 </button>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               {/* Video Track */}
               <div className="flex gap-1">
@@ -146,7 +185,7 @@ export function VideoEditor() {
                     className="relative h-20 rounded-lg overflow-hidden border border-border group cursor-pointer"
                     style={{ width: `${scene.duration * 12}px` }}
                   >
-                    <img
+                    <Image
                       src={scene.thumbnail}
                       alt={scene.name}
                       className="w-full h-full object-cover"
@@ -157,19 +196,25 @@ export function VideoEditor() {
                   </div>
                 ))}
               </div>
-              
+
               {/* Subtitle Track */}
               {subtitlesEnabled && (
                 <div className="h-10 bg-gradient-to-r from-purple-100 to-purple-50 rounded-lg flex items-center px-2 gap-1 overflow-hidden">
-                  <div className="bg-purple-500/30 h-6 rounded px-2 flex items-center text-xs whitespace-nowrap" style={{ width: "96px" }}>
+                  <div
+                    className="bg-purple-500/30 h-6 rounded px-2 flex items-center text-xs whitespace-nowrap"
+                    style={{ width: "96px" }}
+                  >
                     Welcome to
                   </div>
-                  <div className="bg-purple-500/30 h-6 rounded px-2 flex items-center text-xs whitespace-nowrap" style={{ width: "144px" }}>
+                  <div
+                    className="bg-purple-500/30 h-6 rounded px-2 flex items-center text-xs whitespace-nowrap"
+                    style={{ width: "144px" }}
+                  >
                     this stunning loft
                   </div>
                 </div>
               )}
-              
+
               {/* Audio Track */}
               <div className="h-12 bg-gradient-to-r from-black/5 to-black/10 rounded-lg flex items-center px-2">
                 <div className="flex gap-0.5 h-6 items-end w-full">
@@ -202,7 +247,7 @@ export function VideoEditor() {
         {/* Sidebar Tools */}
         <div className="w-full lg:w-72 bg-white rounded-xl border border-border p-4 flex-shrink-0 overflow-y-auto order-1 lg:order-2">
           <h3 className="mb-4">Properties</h3>
-          
+
           <div className="space-y-4">
             {/* Subtitles Section */}
             <div className="pb-4 border-b border-border">
@@ -211,12 +256,12 @@ export function VideoEditor() {
                   <Subtitles size={16} />
                   Subtitles
                 </label>
-                <Switch 
+                <Switch
                   checked={subtitlesEnabled}
                   onCheckedChange={setSubtitlesEnabled}
                 />
               </div>
-              
+
               {subtitlesEnabled && (
                 <div className="space-y-3 pl-6">
                   <div>
@@ -228,7 +273,7 @@ export function VideoEditor() {
                       <option>Mandarin</option>
                     </select>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm mb-2">Style</label>
                     <select className="w-full px-3 py-2 border border-border rounded-lg bg-white text-sm">
@@ -238,7 +283,7 @@ export function VideoEditor() {
                       <option>Minimal</option>
                     </select>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm mb-2">Position</label>
                     <select className="w-full px-3 py-2 border border-border rounded-lg bg-white text-sm">
@@ -247,7 +292,7 @@ export function VideoEditor() {
                       <option>Center</option>
                     </select>
                   </div>
-                  
+
                   <button className="w-full px-3 py-2 border border-border rounded-lg hover:bg-secondary transition-colors text-sm flex items-center justify-center gap-2">
                     <Plus size={14} />
                     Edit Captions

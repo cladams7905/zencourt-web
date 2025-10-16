@@ -9,7 +9,7 @@ import {
   DialogTitle
 } from "./ui/dialog";
 import { DragDropZone } from "./DragDropZone";
-import { ImagePreviewGrid } from "./ImagePreviewGrid";
+import { ImageUploadGrid } from "./shared/ImageUploadGrid";
 import { ImageData, createImageDataArray } from "@/types/image";
 import { uploadFiles, getProjectFolder } from "@/services/storage";
 
@@ -47,11 +47,34 @@ export function UploadProjectModal({
     try {
       // Generate preview URLs and metadata for all files
       const imageDataArray = await createImageDataArray(files);
-      setImages(imageDataArray);
+
+      // Filter out duplicates based on filename
+      setImages((prev) => {
+        const existingFilenames = new Set(prev.map(img => img.file.name));
+        const newImages = imageDataArray.filter(
+          img => !existingFilenames.has(img.file.name)
+        );
+
+        // Log if any duplicates were skipped
+        const duplicateCount = imageDataArray.length - newImages.length;
+        if (duplicateCount > 0) {
+          console.log(`Skipped ${duplicateCount} duplicate image(s)`);
+        }
+
+        return [...prev, ...newImages];
+      });
+
       console.log("Images loaded:", imageDataArray);
 
-      // Automatically start uploading
-      await handleUploadImages(imageDataArray);
+      // Only upload the non-duplicate images
+      const existingFilenames = new Set(images.map(img => img.file.name));
+      const newImagesToUpload = imageDataArray.filter(
+        img => !existingFilenames.has(img.file.name)
+      );
+
+      if (newImagesToUpload.length > 0) {
+        await handleUploadImages(newImagesToUpload);
+      }
     } catch (error) {
       console.error("Error generating previews:", error);
     } finally {
@@ -225,7 +248,7 @@ export function UploadProjectModal({
                 </div>
               )}
 
-              <ImagePreviewGrid
+              <ImageUploadGrid
                 images={images}
                 onRemove={handleRemoveImage}
                 onRetry={handleRetryUpload}

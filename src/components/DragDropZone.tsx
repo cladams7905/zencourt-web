@@ -16,7 +16,7 @@ export function DragDropZone({
   maxFiles = 50,
   maxFileSize = 10 * 1024 * 1024, // 10MB in bytes
   acceptedFormats = [".jpg", ".jpeg", ".png", ".webp"],
-  isDisabled = false,
+  isDisabled = false
 }: DragDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +45,9 @@ export function DragDropZone({
 
     // Check file count
     if (files.length > maxFiles) {
-      setError(`Maximum ${maxFiles} files allowed. You selected ${files.length} files.`);
+      setError(
+        `Maximum ${maxFiles} files allowed. You selected ${files.length} files.`
+      );
       return;
     }
 
@@ -74,14 +76,18 @@ export function DragDropZone({
 
     if (invalidTypeFiles.length > 0) {
       errorMessages.push(
-        `Invalid file type(s): ${invalidTypeFiles.join(", ")}. Only ${acceptedFormats.join(", ")} files are allowed.`
+        `Invalid file type(s): ${invalidTypeFiles.join(
+          ", "
+        )}. Only ${acceptedFormats.join(", ")} files are allowed.`
       );
     }
 
     if (oversizedFiles.length > 0) {
       const maxSizeMB = (maxFileSize / (1024 * 1024)).toFixed(0);
       errorMessages.push(
-        `File(s) too large: ${oversizedFiles.join(", ")}. Maximum size is ${maxSizeMB}MB per file.`
+        `File(s) too large: ${oversizedFiles.join(
+          ", "
+        )}. Maximum size is ${maxSizeMB}MB per file.`
       );
     }
 
@@ -185,11 +191,13 @@ export function DragDropZone({
 
         <div className="text-center">
           <p className="text-base font-medium mb-2">
-            {isDragging ? "Drop your images here" : "Click to upload or drag and drop"}
+            {isDragging ? "Drop your images here" : "Click to upload"}
           </p>
           <p className="text-sm text-muted-foreground">
-            {acceptedFormats.map((ext) => ext.toUpperCase().replace(".", "")).join(", ")} files
-            up to 10MB each
+            {acceptedFormats
+              .map((ext) => ext.toUpperCase().replace(".", ""))
+              .join(", ")}{" "}
+            files up to 10MB each
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             Maximum {maxFiles} images

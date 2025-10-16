@@ -2,6 +2,7 @@ import { Play, MoreVertical, Plus, Video, LayoutGrid } from "lucide-react";
 import { useState } from "react";
 import { EmptyState } from "./EmptyState";
 import { UploadProjectModal } from "./UploadProjectModal";
+import Image from "next/image";
 
 // Project type definition
 interface Project {
@@ -117,14 +118,14 @@ export function ProjectsView() {
               {project.format === "vertical" ? (
                 <>
                   {/* Blurred background - TikTok style */}
-                  <img
+                  <Image
                     src={project.thumbnail}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-60"
                   />
                   {/* Main centered vertical video */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <img
+                    <Image
                       src={project.thumbnail}
                       alt={project.title}
                       className="h-full w-auto object-cover"
@@ -132,7 +133,7 @@ export function ProjectsView() {
                   </div>
                 </>
               ) : (
-                <img
+                <Image
                   src={project.thumbnail}
                   alt={project.title}
                   className="w-full h-full object-cover"

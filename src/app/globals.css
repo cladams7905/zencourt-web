@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Quicksand:wght@400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Quicksand:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -12,7 +12,7 @@
   --popover: #ffffff;
   --popover-foreground: #000000;
   --primary: #000000;
-  --primary-foreground: #ffffff;
+  --primary-foreground: oklch(0.269 0 0);
   --secondary: #f5f5f5;
   --secondary-foreground: #000000;
   --muted: #f5f5f5;
@@ -129,11 +129,16 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Quicksand', sans-serif;
+    font-family: "Quicksand", sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'League Spartan', sans-serif;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "League Spartan", sans-serif;
   }
 }
 
