@@ -1,4 +1,9 @@
-import { Home, Video, Share2, Settings, Upload } from "lucide-react";
+'use client';
+
+import { Home, Video, Share2, Settings, Upload, LogOut } from "lucide-react";
+import { useUser } from "@stackframe/stack";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 
 interface SidebarProps {
   activeTab: string;
@@ -6,12 +11,29 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const user = useUser();
+
   const navItems = [
-    { id: "projects", label: "Projects", icon: Home },
-    { id: "editor", label: "Video Editor", icon: Video },
-    { id: "social", label: "Social Media", icon: Share2 },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "projects", label: "Projects", icon: Home }
+    // { id: "editor", label: "Video Editor", icon: Video },
+    // { id: "social", label: "Social Media", icon: Share2 },
+    // { id: "settings", label: "Settings", icon: Settings },
   ];
+
+  const getUserInitials = () => {
+    if (!user?.displayName) return "U";
+    return user.displayName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handleLogout = async () => {
+    await user?.signOut();
+    window.location.href = '/auth';
+  };
 
   return (
     <>
@@ -41,11 +63,36 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           })}
         </nav>
 
+        {/* User Profile Section */}
         <div className="p-4 border-t border-border">
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-black text-white hover:bg-black/90 transition-colors">
-            <Upload size={20} />
-            <span>Upload Photos</span>
-          </button>
+          {user ? (
+            <>
+              <div className="flex items-center gap-3 mb-3">
+                <Avatar>
+                  <AvatarImage src={user.profileImageUrl || undefined} />
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user.displayName || 'User'}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {user.primaryEmail}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleLogout}
+              >
+                <LogOut size={16} className="mr-2" />
+                Log out
+              </Button>
+            </>
+          ) : (
+            <div className="text-center text-sm text-muted-foreground">
+              Loading...
+            </div>
+          )}
         </div>
       </div>
 
@@ -65,7 +112,9 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 }`}
               >
                 <Icon size={20} className="flex-shrink-0" />
-                <span className="text-xs truncate w-full text-center">{item.label}</span>
+                <span className="text-xs truncate w-full text-center">
+                  {item.label}
+                </span>
               </button>
             );
           })}
@@ -76,10 +125,14 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-border px-4 py-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl tracking-tight">zencourt</h1>
-          <button className="flex items-center gap-2 px-3 py-2 bg-black text-white rounded-lg text-sm">
-            <Upload size={16} />
-            <span className="hidden xs:inline">Upload</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {user && (
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user.profileImageUrl || undefined} />
+                <AvatarFallback className="text-xs">{getUserInitials()}</AvatarFallback>
+              </Avatar>
+            )}
+          </div>
         </div>
       </div>
     </>
