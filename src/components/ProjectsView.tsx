@@ -1,76 +1,56 @@
 import { Play, MoreVertical, Plus, Video, LayoutGrid } from "lucide-react";
 import { useState } from "react";
+import { EmptyState } from "./EmptyState";
+import { UploadProjectModal } from "./UploadProjectModal";
+
+// Project type definition
+interface Project {
+  id: number;
+  title: string;
+  thumbnail: string;
+  duration: string;
+  status: string;
+  format: "vertical" | "landscape";
+  platform: string;
+  subtitles: boolean;
+}
 
 export function ProjectsView() {
   const [filter, setFilter] = useState<"all" | "vertical" | "landscape">("all");
-  
-  const projects = [
-    {
-      id: 1,
-      title: "Cozy Family Home",
-      thumbnail: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&q=80",
-      duration: "0:45",
-      status: "Rendered",
-      format: "vertical" as const,
-      platform: "TikTok, Instagram",
-      subtitles: true,
-    },
-    {
-      id: 2,
-      title: "Suburban Ranch House",
-      thumbnail: "https://images.unsplash.com/photo-1560170412-0f7df0eb0fb1?w=400&q=80",
-      duration: "1:20",
-      status: "Processing",
-      format: "vertical" as const,
-      platform: "YouTube Shorts",
-      subtitles: true,
-    },
-    {
-      id: 3,
-      title: "3BR Home with Backyard",
-      thumbnail: "https://images.unsplash.com/photo-1757955261415-98ac0deb5c73?w=400&q=80",
-      duration: "0:58",
-      status: "Rendered",
-      format: "vertical" as const,
-      platform: "Instagram Reels",
-      subtitles: false,
-    },
-    {
-      id: 4,
-      title: "Updated Living Spaces",
-      thumbnail: "https://images.unsplash.com/photo-1671966550483-bed07f4c93b4?w=400&q=80",
-      duration: "1:05",
-      status: "Draft",
-      format: "vertical" as const,
-      platform: "TikTok",
-      subtitles: true,
-    },
-    {
-      id: 5,
-      title: "Move-In Ready Home",
-      thumbnail: "https://images.unsplash.com/photo-1694885090746-d90472e11c0e?w=400&q=80",
-      duration: "2:30",
-      status: "Rendered",
-      format: "landscape" as const,
-      platform: "YouTube",
-      subtitles: true,
-    },
-    {
-      id: 6,
-      title: "Modern Kitchen Remodel",
-      thumbnail: "https://images.unsplash.com/photo-1722649957265-372809976610?w=400&q=80",
-      duration: "0:52",
-      status: "Rendered",
-      format: "vertical" as const,
-      platform: "TikTok, YouTube",
-      subtitles: true,
-    },
-  ];
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  const handleCreateProject = () => {
+    setIsUploadModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsUploadModalOpen(false);
+  };
+
+  const handleProjectCreated = (project: Project) => {
+    setProjects([...projects, project]);
+    setIsUploadModalOpen(false);
+  };
 
   const filteredProjects = projects.filter((project) => {
     if (filter === "all") return true;
     return project.format === filter;
   });
+
+  // Show empty state if no projects exist
+  if (projects.length === 0) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 min-h-screen flex items-center justify-center">
+        <EmptyState onCreateProject={handleCreateProject} />
+        <UploadProjectModal
+          isOpen={isUploadModalOpen}
+          onClose={handleCloseModal}
+          onProjectCreated={handleProjectCreated}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -81,7 +61,10 @@ export function ProjectsView() {
             AI-generated home walkthrough videos optimized for social media
           </p>
         </div>
-        <button className="px-4 sm:px-6 py-2 sm:py-3 bg-black text-white rounded-lg hover:bg-black/90 transition-colors flex items-center gap-2 justify-center sm:justify-start">
+        <button
+          onClick={handleCreateProject}
+          className="px-4 sm:px-6 py-2 sm:py-3 bg-black text-white rounded-lg hover:bg-black/90 transition-colors flex items-center gap-2 justify-center sm:justify-start"
+        >
           <Plus size={20} />
           New Project
         </button>
@@ -119,7 +102,8 @@ export function ProjectsView() {
           }`}
         >
           <LayoutGrid size={16} />
-          <span className="hidden xs:inline">Landscape</span> <span>(16:9)</span>
+          <span className="hidden xs:inline">Landscape</span>{" "}
+          <span>(16:9)</span>
         </button>
       </div>
 
@@ -192,6 +176,12 @@ export function ProjectsView() {
           </div>
         ))}
       </div>
+
+      <UploadProjectModal
+        isOpen={isUploadModalOpen}
+        onClose={handleCloseModal}
+        onProjectCreated={handleProjectCreated}
+      />
     </div>
   );
 }

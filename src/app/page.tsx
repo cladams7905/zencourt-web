@@ -23,7 +23,7 @@ export default function Home() {
 
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      <div className="flex-1 overflow-auto relative z-10 pt-16 pb-20 lg:pt-0 lg:pb-0">
+      <div className="flex-1 overflow-auto relative z-10 pt-16 lg:pt-0 lg:pb-0">
         {activeTab === "projects" && <ProjectsView />}
         {activeTab === "editor" && <VideoEditor />}
         {activeTab === "social" && <SocialMediaView />}
