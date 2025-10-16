@@ -8,10 +8,14 @@ import {
   DialogHeader,
   DialogTitle
 } from "./ui/dialog";
+import { Button } from "./ui/button";
 import { DragDropZone } from "./DragDropZone";
 import { ImageUploadGrid } from "./shared/ImageUploadGrid";
+import { ImagePreviewModal } from "./modals/ImagePreviewModal";
 import { ImageData, createImageDataArray } from "@/types/image";
 import { uploadFiles, getProjectFolder } from "@/services/storage";
+import { processImages } from "@/services/imageProcessor";
+import type { ProcessedImage } from "@/services/imageProcessor";
 
 interface Project {
   id: number;
@@ -41,6 +45,8 @@ export function UploadProjectModal({
   const [images, setImages] = useState<ImageData[]>([]);
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<ImageData | null>(null);
+  const [isCategorizing, setIsCategorizing] = useState(false);
 
   const handleFilesSelected = async (files: File[]) => {
     setIsLoadingPreviews(true);
@@ -50,9 +56,9 @@ export function UploadProjectModal({
 
       // Filter out duplicates based on filename
       setImages((prev) => {
-        const existingFilenames = new Set(prev.map(img => img.file.name));
+        const existingFilenames = new Set(prev.map((img) => img.file.name));
         const newImages = imageDataArray.filter(
-          img => !existingFilenames.has(img.file.name)
+          (img) => !existingFilenames.has(img.file.name)
         );
 
         // Log if any duplicates were skipped
@@ -67,9 +73,9 @@ export function UploadProjectModal({
       console.log("Images loaded:", imageDataArray);
 
       // Only upload the non-duplicate images
-      const existingFilenames = new Set(images.map(img => img.file.name));
+      const existingFilenames = new Set(images.map((img) => img.file.name));
       const newImagesToUpload = imageDataArray.filter(
-        img => !existingFilenames.has(img.file.name)
+        (img) => !existingFilenames.has(img.file.name)
       );
 
       if (newImagesToUpload.length > 0) {
@@ -221,9 +227,63 @@ export function UploadProjectModal({
     setImages((prev) => prev.filter((img) => img.id !== imageId));
   };
 
+  const handleImageClick = (imageId: string) => {
+    const image = images.find((img) => img.id === imageId);
+    if (image) {
+      setPreviewImage(image);
+    }
+  };
+
+  const handleContinue = async () => {
+    // Check if all images are uploaded successfully
+    const allUploaded = images.every((img) => img.uploadStatus === "uploaded");
+    if (!allUploaded) {
+      console.warn("Not all images are uploaded yet");
+      return;
+    }
+
+    setIsCategorizing(true);
+    setStep("categorizing");
+
+    try {
+      const projectId = `temp-${Date.now()}`;
+
+      // Process images with AI categorization using the full ImageData objects
+      const result = await processImages(images, projectId, {
+        onProgress: (progress) => {
+          console.log(
+            `Processing: ${progress.phase} - ${progress.overallProgress}%`
+          );
+        }
+      });
+
+      console.log("Processing complete:", result);
+      setStep("review");
+      // TODO: Display categorized results in the review step
+    } catch (error) {
+      console.error("Error processing images:", error);
+      setStep("upload");
+    } finally {
+      setIsCategorizing(false);
+    }
+  };
+
+  // Check if we can continue (at least one uploaded image)
+  const canContinue =
+    images.length > 0 && images.some((img) => img.uploadStatus === "uploaded");
+  const allUploadedOrError =
+    images.length > 0 &&
+    images.every(
+      (img) => img.uploadStatus === "uploaded" || img.uploadStatus === "error"
+    );
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className={`max-w-4xl max-h-[90vh] overflow-y-auto ${
+          (allUploadedOrError || isUploading) && "pb-0"
+        }`}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl">Create New Project</DialogTitle>
           <DialogDescription>
@@ -252,7 +312,36 @@ export function UploadProjectModal({
                 images={images}
                 onRemove={handleRemoveImage}
                 onRetry={handleRetryUpload}
+                onImageClick={handleImageClick}
               />
+
+              {/* Continue Button - Sticky at bottom */}
+              {canContinue && (
+                <>
+                  {/* Fade overlay sitting ABOVE the sticky footer */}
+                  <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-12 bg-gradient-to-t from-white via-white to-transparent" />
+
+                  {/* Sticky footer */}
+                  <div className="sticky bottom-0 left-0 right-0 z-20 pt-0 pb-4 bg-white">
+                    <Button
+                      onClick={handleContinue}
+                      disabled={!allUploadedOrError || isCategorizing}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isCategorizing
+                        ? "Processing..."
+                        : !allUploadedOrError
+                        ? "Waiting for uploads to complete..."
+                        : `Continue with ${
+                            images.filter(
+                              (img) => img.uploadStatus === "uploaded"
+                            ).length
+                          } image(s)`}
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           )}
 
@@ -277,6 +366,40 @@ export function UploadProjectModal({
           )}
         </div>
       </DialogContent>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <ImagePreviewModal
+          isOpen={!!previewImage}
+          onClose={() => setPreviewImage(null)}
+          currentImage={{
+            id: previewImage.id,
+            file: previewImage.file,
+            previewUrl: previewImage.previewUrl,
+            uploadUrl: previewImage.uploadUrl,
+            status: "uploaded"
+          }}
+          allImages={images.map((img) => ({
+            id: img.id,
+            file: img.file,
+            previewUrl: img.previewUrl,
+            uploadUrl: img.uploadUrl,
+            status: "uploaded"
+          }))}
+          currentIndex={images.findIndex((img) => img.id === previewImage.id)}
+          onNavigate={(index) => {
+            const newImage = images[index];
+            if (newImage) {
+              setPreviewImage(newImage);
+            }
+          }}
+          categoryInfo={{
+            displayLabel: "Upload",
+            color: "#6b7280"
+          }}
+          showMetadata={false}
+        />
+      )}
     </Dialog>
   );
 }

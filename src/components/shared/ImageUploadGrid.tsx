@@ -15,12 +15,14 @@ interface ImageUploadGridProps {
   images: ImageData[];
   onRemove: (imageId: string) => void;
   onRetry?: (imageId: string) => void;
+  onImageClick?: (imageId: string) => void;
 }
 
 export function ImageUploadGrid({
   images,
   onRemove,
-  onRetry
+  onRetry,
+  onImageClick
 }: ImageUploadGridProps) {
   if (images.length === 0) return null;
 
@@ -38,13 +40,20 @@ export function ImageUploadGrid({
             key={image.id}
             className="relative group aspect-square rounded-lg overflow-hidden border bg-muted"
           >
-            <Image
-              src={image.previewUrl}
-              alt={image.file.name}
-              fill
-              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
-              className="object-cover"
-            />
+            <div
+              onClick={() => onImageClick?.(image.id)}
+              className={`absolute inset-0 ${
+                onImageClick ? "cursor-pointer" : ""
+              }`}
+            >
+              <Image
+                src={image.previewUrl}
+                alt={image.file.name}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                className="object-cover"
+              />
+            </div>
 
             {/* Hover overlay */}
             <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-50 transition-opacity pointer-events-none" />
@@ -52,7 +61,7 @@ export function ImageUploadGrid({
             {/* Remove X button (appears on hover in top-right) */}
             <button
               onClick={() => onRemove(image.id)}
-              className="absolute top-2 right-2 z-20 p-1 bg-primary/50 hover:bg-primary-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-2 right-2 z-20 p-1 bg-primary/50 hover:bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
               aria-label="Remove image"
             >
               <X className="w-4 h-4 text-white" />
