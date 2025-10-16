@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/demo-images
+
+# claude
+.claude/
 
 # next.js
 /.next/
