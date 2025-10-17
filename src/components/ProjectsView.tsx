@@ -6,9 +6,13 @@ import Image from "next/image";
 import { Project } from "@/types/schema";
 import HouseFallback from "@/../public/house_fallback.png";
 
-export function ProjectsView() {
+interface ProjectsViewProps {
+  initialProjects: Project[];
+}
+
+export function ProjectsView({ initialProjects }: ProjectsViewProps) {
   const [filter, setFilter] = useState<"all" | "vertical" | "landscape">("all");
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const handleCreateProject = () => {
