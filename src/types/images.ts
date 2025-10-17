@@ -1,5 +1,5 @@
 import { Image } from "./schema";
-import { RoomClassification } from "./roomCategory";
+import { RoomCategory, RoomClassification } from "./roomCategory";
 
 /**
  * Processing status for images throughout the workflow
@@ -42,6 +42,22 @@ export interface ProcessedImage
   status: ImageProcessingStatus;
   /** Error message if failed */
   error?: string;
+}
+
+/**
+ * Serializable image data for server actions
+ * Excludes File objects and data URLs to stay under 1MB limit
+ */
+export interface SerializableImageData {
+  id: string;
+  filename: string;
+  uploadUrl: string;
+  classification?: {
+    category: RoomCategory;
+    confidence: number;
+    features?: string[];
+  };
+  metadata?: ImageMetadata;
 }
 
 /**

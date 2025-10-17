@@ -15,12 +15,21 @@ import { DragDropZone } from "./DragDropZone";
 import { ImageUploadGrid } from "./shared/ImageUploadGrid";
 import { ImagePreviewModal } from "./modals/ImagePreviewModal";
 import { CategorizedImageGrid } from "./image-grid/CategorizedImageGrid";
-import { createProject } from "@/db/actions/projects";
+import {
+  createProject,
+  updateProject,
+  getNextDraftNumber
+} from "@/db/actions/projects";
+import { saveImages } from "@/db/actions/images";
 import { uploadFiles, getProjectFolder } from "@/services/storage";
 import { imageProcessorService } from "@/services/imageProcessor";
 import { categorizeAndOrganizeImages } from "@/services/categorization";
 import { Project } from "@/types/schema";
-import type { ProcessedImage, ProcessingProgress } from "@/types/images";
+import type {
+  ProcessedImage,
+  ProcessingProgress,
+  SerializableImageData
+} from "@/types/images";
 import type { CategorizedGroup } from "@/types/roomCategory";
 import { Progress } from "./ui/progress";
 
@@ -350,6 +359,9 @@ export function UploadProjectModal({
     setProcessingProgress(null);
 
     try {
+      // Update project status to analyzing
+      await updateProject(currentProject.id, { status: "analyzing" });
+
       // Separate already-analyzed images from new images that need processing
       const alreadyAnalyzed = images.filter(
         (img) =>
@@ -357,10 +369,7 @@ export function UploadProjectModal({
           (img.status === "uploaded" || img.status === "analyzed")
       );
       const needsAnalysis = images.filter(
-        (img) =>
-          !img.classification &&
-          img.status === "uploaded" &&
-          !img.error
+        (img) => !img.classification && img.status === "uploaded" && !img.error
       );
 
       console.log(
@@ -427,9 +436,74 @@ export function UploadProjectModal({
     }
   };
 
+  const handleSaveDraft = async () => {
+    if (!currentProject) {
+      toast.error("No project to save", {
+        description: "Please try again."
+      });
+      return;
+    }
+
+    try {
+      // Get the next draft number
+      const draftNumber = await getNextDraftNumber();
+      const draftTitle = `Draft ${draftNumber}`;
+
+      // Convert ProcessedImage to SerializableImageData (exclude File objects and data URLs)
+      const serializableImages: SerializableImageData[] = images.map((img) => ({
+        id: img.id,
+        filename: img.file.name,
+        uploadUrl: img.uploadUrl || "",
+        classification: img.classification
+          ? {
+              category: img.classification.category,
+              confidence: img.classification.confidence,
+              features: img.classification.features
+            }
+          : undefined,
+        metadata: {
+          size: img.file.size,
+          format: img.file.type,
+          width: img.metadata?.width || 0,
+          height: img.metadata?.height || 0,
+          lastModified: img.metadata?.lastModified || 0
+        }
+      }));
+
+      // Save images to database
+      await saveImages(currentProject.id, serializableImages);
+
+      // Update project with draft title and status
+      const updatedProject = await updateProject(currentProject.id, {
+        title: draftTitle,
+        status: "draft"
+      });
+
+      // Show success toast
+      toast.success("Draft project saved!", {
+        description: `${draftTitle} has been saved. You can rename and edit it anytime from your dashboard.`
+      });
+
+      // Close modal and notify parent
+      if (onProjectCreated) {
+        onProjectCreated(updatedProject);
+      }
+      onClose();
+    } catch (error) {
+      console.error("Error saving draft:", error);
+      toast.error("Failed to save draft", {
+        description:
+          error instanceof Error ? error.message : "Please try again."
+      });
+    }
+  };
+
   // Check if we can continue (at least one uploaded image)
   const canContinue =
-    images.length > 0 && images.some((img) => img.status === "uploaded" || img.status === "analyzed");
+    images.length > 0 &&
+    images.some(
+      (img) => img.status === "uploaded" || img.status === "analyzed"
+    );
   const allUploadedOrError =
     images.length > 0 &&
     images.every(
@@ -627,9 +701,7 @@ export function UploadProjectModal({
 
                 // Also update the images array to reflect the classification change
                 setImages((prev) =>
-                  prev.map((img) =>
-                    img.id === imageId ? updatedImage : img
-                  )
+                  prev.map((img) => (img.id === imageId ? updatedImage : img))
                 );
 
                 toast.success("Image recategorized", {
@@ -650,16 +722,10 @@ export function UploadProjectModal({
               >
                 Back to Upload
               </Button>
-              <Button onClick={() => setStep("naming")} className="flex-1">
-                Continue to Name Project
+              <Button onClick={handleSaveDraft} className="flex-1">
+                Save Draft Project
               </Button>
             </div>
-          </div>
-        )}
-
-        {step === "naming" && (
-          <div className="flex items-center justify-center min-h-[300px]">
-            <p className="text-muted-foreground">Name your project...</p>
           </div>
         )}
       </DialogContent>
@@ -721,15 +787,11 @@ export function UploadProjectModal({
               ? {
                   displayLabel:
                     categorizedGroups.find((g) =>
-                      g.images.some(
-                        (img) => img.id === previewImageFromGrid.id
-                      )
+                      g.images.some((img) => img.id === previewImageFromGrid.id)
                     )?.displayLabel || "Unknown",
                   color:
                     categorizedGroups.find((g) =>
-                      g.images.some(
-                        (img) => img.id === previewImageFromGrid.id
-                      )
+                      g.images.some((img) => img.id === previewImageFromGrid.id)
                     )?.metadata.color || "#6b7280"
                 }
               : undefined

@@ -15,6 +15,7 @@ import {
 import { sql } from "drizzle-orm";
 import { authenticatedRole, authUid, crudPolicy } from "drizzle-orm/neon";
 import { ImageMetadata } from "@/types/images";
+import { ProjectStatus } from "@/types/projects";
 
 /**
  * Projects table
@@ -26,7 +27,10 @@ export const projects = pgTable(
     id: text("id").primaryKey(), // UUID or custom ID
     userId: text("user_id").notNull(), // From Stack Auth
     title: text("title"),
-    status: varchar("status", { length: 50 }).notNull().default("uploading"), // uploading, processing, completed, failed
+    status: varchar("status", { length: 50 })
+      .$type<ProjectStatus>()
+      .notNull()
+      .default("uploading"), // uploading, analyzing, draft, published
     format: varchar("format", { length: 20 }), // vertical, landscape
     platform: varchar("platform", { length: 50 }), // youtube, tiktok, instagram, etc.
     thumbnailUrl: text("thumbnail_url"),
