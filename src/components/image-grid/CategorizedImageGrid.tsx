@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import * as Icons from "lucide-react";
 import type { ProcessedImage } from "@/types/images";
 import { ImagePreviewModal } from "../modals/ImagePreviewModal";
@@ -94,6 +94,9 @@ export function CategorizedImageGrid({
   showPreviewMetadata = true,
   emptyMessage = "No images to display"
 }: CategorizedImageGridProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(groups.map((g, i) => `${g.category}-${i}`))
   );
@@ -113,6 +116,15 @@ export function CategorizedImageGrid({
     isOpen: false,
     currentIndex: 0
   });
+
+  // Cleanup auto-scroll on unmount or when dragging stops
+  useEffect(() => {
+    return () => {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Flatten all images for preview navigation
   const allImages = useMemo(() => {
@@ -198,6 +210,12 @@ export function CategorizedImageGrid({
   };
 
   const handleDragEnd = () => {
+    // Clear auto-scroll interval
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+
     setDragState({
       isDragging: false,
       draggedImage: null,
@@ -211,6 +229,55 @@ export function CategorizedImageGrid({
     if (!enableDragDrop || !dragState.isDragging) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
+
+    // Auto-scroll logic - find the scrollable parent container
+    if (containerRef.current) {
+      // Find the closest scrollable parent
+      let scrollContainer: HTMLElement | null = containerRef.current;
+      while (scrollContainer) {
+        const style = window.getComputedStyle(scrollContainer);
+        const isScrollable =
+          style.overflowY === "auto" ||
+          style.overflowY === "scroll" ||
+          scrollContainer === document.documentElement;
+
+        if (
+          isScrollable &&
+          scrollContainer.scrollHeight > scrollContainer.clientHeight
+        ) {
+          break;
+        }
+
+        scrollContainer = scrollContainer.parentElement;
+      }
+
+      if (scrollContainer) {
+        const rect = scrollContainer.getBoundingClientRect();
+        const mouseY = e.clientY;
+        const scrollThreshold = 100; // pixels from edge to start scrolling
+        const scrollSpeed = 10; // pixels per interval
+
+        // Clear existing interval
+        if (autoScrollIntervalRef.current) {
+          clearInterval(autoScrollIntervalRef.current);
+          autoScrollIntervalRef.current = null;
+        }
+
+        // Scroll up when near top
+        if (mouseY - rect.top < scrollThreshold) {
+          autoScrollIntervalRef.current = setInterval(() => {
+            scrollContainer!.scrollTop -= scrollSpeed;
+          }, 16); // ~60fps
+        }
+        // Scroll down when near bottom
+        else if (rect.bottom - mouseY < scrollThreshold) {
+          autoScrollIntervalRef.current = setInterval(() => {
+            scrollContainer!.scrollTop += scrollSpeed;
+          }, 16);
+        }
+      }
+    }
+
     if (dragState.dropTargetCategoryIndex !== categoryIndex) {
       setDragState((prev) => ({
         ...prev,
@@ -248,7 +315,7 @@ export function CategorizedImageGrid({
 
   return (
     <>
-      <div className="space-y-6">
+      <div ref={containerRef} className="space-y-6">
         {/* Drag Instructions */}
         {enableDragDrop && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
@@ -504,7 +571,7 @@ function ImageThumbnail({
       )}
 
       {enableDrag && !isLoading && !isError && (
-        <div className="absolute top-2 right-2 z-10 p-1 bg-black bg-opacity-50 rounded cursor-move">
+        <div className="absolute top-2 right-2 z-10 p-1 bg-black/50 hover:bg-black bg-opacity-50 rounded cursor-move">
           <Icons.GripVertical className="w-4 h-4 text-white" />
         </div>
       )}
@@ -565,7 +632,7 @@ function ImageThumbnail({
         )}
 
         {!isLoading && !isError && showConfidence && confidence > 0 && (
-          <div className="absolute bottom-2 left-2 px-2 py-1 bg-black bg-opacity-75 text-white text-xs rounded">
+          <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 bg-opacity-75 text-white text-xs rounded">
             {(confidence * 100).toFixed(0)}%
           </div>
         )}
