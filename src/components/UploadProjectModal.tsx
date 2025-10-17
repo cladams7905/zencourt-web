@@ -558,6 +558,7 @@ export function UploadProjectModal({
             <CategorizedImageGrid
               groups={categorizedGroups}
               enablePreview={false}
+              enableDragDrop={true}
               showConfidence={true}
               showPreviewMetadata={true}
               onImageClick={(image, categoryIndex, imageIndex) => {
@@ -571,6 +572,69 @@ export function UploadProjectModal({
                 setPreviewImageFromGrid(image);
                 setPreviewIndexFromGrid(globalIndex);
                 setInternalIsOpen(false);
+              }}
+              onRecategorize={(imageId, fromCategoryIndex, toCategoryIndex) => {
+                // Find the image in the source category
+                const fromGroup = categorizedGroups[fromCategoryIndex];
+                const toGroup = categorizedGroups[toCategoryIndex];
+
+                if (!fromGroup || !toGroup) return;
+
+                const imageIndex = fromGroup.images.findIndex(
+                  (img) => img.id === imageId
+                );
+                if (imageIndex === -1) return;
+
+                const movedImage = fromGroup.images[imageIndex];
+
+                // Update the image's classification to match new category
+                const updatedImage: ProcessedImage = {
+                  ...movedImage,
+                  classification: {
+                    ...movedImage.classification!,
+                    category: toGroup.category
+                  }
+                };
+
+                // Create new groups array with updated images
+                const newGroups = [...categorizedGroups];
+
+                // Remove from source category
+                newGroups[fromCategoryIndex] = {
+                  ...fromGroup,
+                  images: fromGroup.images.filter((img) => img.id !== imageId)
+                };
+
+                // Add to destination category
+                newGroups[toCategoryIndex] = {
+                  ...toGroup,
+                  images: [...toGroup.images, updatedImage],
+                  avgConfidence:
+                    [...toGroup.images, updatedImage].reduce(
+                      (sum, img) => sum + (img.classification?.confidence || 0),
+                      0
+                    ) /
+                    (toGroup.images.length + 1)
+                };
+
+                // Filter out empty groups
+                const filteredGroups = newGroups.filter(
+                  (group) => group.images.length > 0
+                );
+
+                // Update categorized groups
+                setCategorizedGroups(filteredGroups);
+
+                // Also update the images array to reflect the classification change
+                setImages((prev) =>
+                  prev.map((img) =>
+                    img.id === imageId ? updatedImage : img
+                  )
+                );
+
+                toast.success("Image recategorized", {
+                  description: `Moved to ${toGroup.displayLabel}`
+                });
               }}
             />
 
