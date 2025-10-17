@@ -13,11 +13,11 @@
 
 import { useState, useMemo } from "react";
 import * as Icons from "lucide-react";
-import type { CategorizedGroup, RoomCategory } from "@/services/categorization";
-import type { ProcessedImage } from "@/services/imageProcessor";
+import type { ProcessedImage } from "@/types/images";
 import { ImagePreviewModal } from "../modals/ImagePreviewModal";
 import { EditableCategoryLabel } from "../shared/EditableCategoryLabel";
 import Image from "next/image";
+import { CategorizedGroup, RoomCategory } from "@/types/roomCategory";
 
 // ============================================================================
 // Types and Interfaces

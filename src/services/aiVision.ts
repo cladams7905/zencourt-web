@@ -5,42 +5,8 @@
  * classify property images by room type for real estate marketing.
  */
 
-import OpenAI from 'openai';
-
-// ============================================================================
-// Types and Interfaces
-// ============================================================================
-
-/**
- * Supported room categories for property image classification
- */
-export type RoomCategory =
-  | 'exterior-front'
-  | 'exterior-backyard'
-  | 'living-room'
-  | 'kitchen'
-  | 'dining-room'
-  | 'bedroom'
-  | 'bathroom'
-  | 'garage'
-  | 'office'
-  | 'laundry-room'
-  | 'basement'
-  | 'other';
-
-/**
- * Room classification result from AI analysis
- */
-export interface RoomClassification {
-  /** Detected room category */
-  category: RoomCategory;
-  /** Confidence score (0-1) */
-  confidence: number;
-  /** Brief explanation of the classification decision */
-  reasoning?: string;
-  /** Key features detected in the image */
-  features?: string[];
-}
+import OpenAI from "openai";
+import type { RoomCategory, RoomClassification } from "@/types/roomCategory";
 
 /**
  * Error types that can occur during AI vision processing
@@ -48,11 +14,11 @@ export interface RoomClassification {
 export class AIVisionError extends Error {
   constructor(
     message: string,
-    public code: 'API_ERROR' | 'TIMEOUT' | 'INVALID_RESPONSE' | 'RATE_LIMIT',
+    public code: "API_ERROR" | "TIMEOUT" | "INVALID_RESPONSE" | "RATE_LIMIT",
     public details?: unknown
   ) {
     super(message);
-    this.name = 'AIVisionError';
+    this.name = "AIVisionError";
   }
 }
 
@@ -61,24 +27,21 @@ export class AIVisionError extends Error {
 // ============================================================================
 
 /**
- * Get OpenAI API client instance
+ * Get OpenAI API client instance (server-side only)
  * Expects OPENAI_API_KEY environment variable to be set
  */
 function getOpenAIClient(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
     throw new AIVisionError(
-      'OpenAI API key not found. Please set OPENAI_API_KEY environment variable.',
-      'API_ERROR'
+      "OpenAI API key not found. Please set OPENAI_API_KEY environment variable.",
+      "API_ERROR"
     );
   }
 
   return new OpenAI({
-    apiKey,
-    // Use dangerouslyAllowBrowser only for client-side usage
-    // In production, API calls should go through server-side routes
-    dangerouslyAllowBrowser: typeof window !== 'undefined',
+    apiKey
   });
 }
 
@@ -165,36 +128,38 @@ export async function classifyRoom(
       // Create timeout promise
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          reject(new AIVisionError(
-            `AI vision request timed out after ${timeout}ms`,
-            'TIMEOUT'
-          ));
+          reject(
+            new AIVisionError(
+              `AI vision request timed out after ${timeout}ms`,
+              "TIMEOUT"
+            )
+          );
         }, timeout);
       });
 
       // Create API request promise
       const apiPromise = client.chat.completions.create({
-        model: 'gpt-4o', // Using gpt-4o which supports vision
+        model: "gpt-4o", // Using gpt-4o which supports vision
         messages: [
           {
-            role: 'user',
+            role: "user",
             content: [
               {
-                type: 'text',
-                text: CLASSIFICATION_PROMPT,
+                type: "text",
+                text: CLASSIFICATION_PROMPT
               },
               {
-                type: 'image_url',
+                type: "image_url",
                 image_url: {
                   url: imageUrl,
-                  detail: 'high', // Use high detail for better classification
-                },
-              },
-            ],
-          },
+                  detail: "high" // Use high detail for better classification
+                }
+              }
+            ]
+          }
         ],
         max_tokens: 500,
-        temperature: 0.3, // Lower temperature for more consistent classifications
+        temperature: 0.3 // Lower temperature for more consistent classifications
       });
 
       // Race between API call and timeout
@@ -205,8 +170,8 @@ export async function classifyRoom(
 
       if (!content) {
         throw new AIVisionError(
-          'No content in API response',
-          'INVALID_RESPONSE',
+          "No content in API response",
+          "INVALID_RESPONSE",
           response
         );
       }
@@ -218,15 +183,14 @@ export async function classifyRoom(
       validateClassification(classification);
 
       return classification;
-
     } catch (error) {
       lastError = error as Error;
 
       // Check if it's a rate limit error
-      if (error instanceof Error && error.message.includes('rate_limit')) {
+      if (error instanceof Error && error.message.includes("rate_limit")) {
         throw new AIVisionError(
-          'OpenAI API rate limit exceeded. Please try again later.',
-          'RATE_LIMIT',
+          "OpenAI API rate limit exceeded. Please try again later.",
+          "RATE_LIMIT",
           error
         );
       }
@@ -238,14 +202,16 @@ export async function classifyRoom(
 
       // Wait before retrying (exponential backoff)
       const waitTime = Math.min(1000 * Math.pow(2, attempt), 5000);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
   }
 
   // All retries failed, throw the last error
   throw new AIVisionError(
-    `Failed to classify room after ${maxRetries + 1} attempts: ${lastError?.message}`,
-    'API_ERROR',
+    `Failed to classify room after ${maxRetries + 1} attempts: ${
+      lastError?.message
+    }`,
+    "API_ERROR",
     lastError
   );
 }
@@ -259,7 +225,9 @@ function parseClassificationResponse(content: string): RoomClassification {
     let jsonContent = content.trim();
 
     // Remove markdown code blocks if present
-    const codeBlockMatch = jsonContent.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+    const codeBlockMatch = jsonContent.match(
+      /```(?:json)?\s*(\{[\s\S]*\})\s*```/
+    );
     if (codeBlockMatch) {
       jsonContent = codeBlockMatch[1];
     }
@@ -272,12 +240,12 @@ function parseClassificationResponse(content: string): RoomClassification {
       category: parsed.category as RoomCategory,
       confidence: parseFloat(parsed.confidence),
       reasoning: parsed.reasoning,
-      features: parsed.features || [],
+      features: parsed.features || []
     };
   } catch (error) {
     throw new AIVisionError(
-      'Failed to parse AI response as JSON',
-      'INVALID_RESPONSE',
+      "Failed to parse AI response as JSON",
+      "INVALID_RESPONSE",
       { content, error }
     );
   }
@@ -288,38 +256,38 @@ function parseClassificationResponse(content: string): RoomClassification {
  */
 function validateClassification(classification: RoomClassification): void {
   const validCategories: RoomCategory[] = [
-    'exterior-front',
-    'exterior-backyard',
-    'living-room',
-    'kitchen',
-    'dining-room',
-    'bedroom',
-    'bathroom',
-    'garage',
-    'office',
-    'laundry-room',
-    'basement',
-    'other',
+    "exterior-front",
+    "exterior-backyard",
+    "living-room",
+    "kitchen",
+    "dining-room",
+    "bedroom",
+    "bathroom",
+    "garage",
+    "office",
+    "laundry-room",
+    "basement",
+    "other"
   ];
 
   // Check category is valid
   if (!validCategories.includes(classification.category)) {
     throw new AIVisionError(
       `Invalid room category: ${classification.category}`,
-      'INVALID_RESPONSE',
+      "INVALID_RESPONSE",
       classification
     );
   }
 
   // Check confidence is in valid range
   if (
-    typeof classification.confidence !== 'number' ||
+    typeof classification.confidence !== "number" ||
     classification.confidence < 0 ||
     classification.confidence > 1
   ) {
     throw new AIVisionError(
       `Invalid confidence value: ${classification.confidence}`,
-      'INVALID_RESPONSE',
+      "INVALID_RESPONSE",
       classification
     );
   }
@@ -348,7 +316,11 @@ export interface BatchClassificationResult {
 /**
  * Progress callback for batch operations
  */
-export type BatchProgressCallback = (completed: number, total: number, result: BatchClassificationResult) => void;
+export type BatchProgressCallback = (
+  completed: number,
+  total: number,
+  result: BatchClassificationResult
+) => void;
 
 /**
  * Helper function to process items in batches with concurrency control
@@ -369,14 +341,13 @@ async function processBatch<T, R>(
   for (let i = 0; i < items.length; i += concurrency) {
     const chunk = items.slice(i, i + concurrency);
     const chunkResults = await Promise.allSettled(
-      chunk.map(item => processor(item))
+      chunk.map((item) => processor(item))
     );
 
     // Process results
     for (const result of chunkResults) {
-      const processedResult = result.status === 'fulfilled'
-        ? result.value
-        : result.reason;
+      const processedResult =
+        result.status === "fulfilled" ? result.value : result.reason;
 
       results.push(processedResult);
       completed++;
@@ -386,6 +357,83 @@ async function processBatch<T, R>(
       }
     }
   }
+
+  return results;
+}
+
+/**
+ * Client-side wrapper that calls the API route for batch classification
+ */
+async function classifyRoomBatchViaAPI(
+  imageUrls: string[],
+  options: {
+    concurrency?: number;
+    timeout?: number;
+    maxRetries?: number;
+    onProgress?: BatchProgressCallback;
+  } = {}
+): Promise<BatchClassificationResult[]> {
+  const {
+    concurrency = 10,
+    timeout = 30000,
+    maxRetries = 2,
+    onProgress
+  } = options;
+
+  // Process images one by one to maintain progress callbacks
+  const processor = async (
+    imageUrl: string
+  ): Promise<BatchClassificationResult> => {
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch("/api/classify-images", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          imageUrl,
+          timeout,
+          maxRetries
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Classification failed");
+      }
+
+      const duration = Date.now() - startTime;
+
+      return {
+        imageUrl,
+        success: true,
+        classification: data.classification,
+        error: null,
+        duration
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      return {
+        imageUrl,
+        success: false,
+        classification: null,
+        error: errorMessage,
+        duration
+      };
+    }
+  };
+
+  // Process in batches with concurrency control
+  const results = await processBatch(imageUrls, processor, {
+    concurrency,
+    onProgress
+  });
 
   return results;
 }
@@ -418,25 +466,29 @@ export async function classifyRoomBatch(
     concurrency = 10,
     timeout = 30000,
     maxRetries = 2,
-    onProgress,
+    onProgress
   } = options;
 
   // Validate input
   if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
-    throw new AIVisionError(
-      'imageUrls must be a non-empty array',
-      'API_ERROR'
-    );
+    throw new AIVisionError("imageUrls must be a non-empty array", "API_ERROR");
   }
 
-  // Process each image URL
-  const processor = async (imageUrl: string): Promise<BatchClassificationResult> => {
+  // If running on client-side, use API route instead of direct OpenAI calls
+  if (typeof window !== "undefined") {
+    return classifyRoomBatchViaAPI(imageUrls, options);
+  }
+
+  // Server-side: Process each image URL directly
+  const processor = async (
+    imageUrl: string
+  ): Promise<BatchClassificationResult> => {
     const startTime = Date.now();
 
     try {
       const classification = await classifyRoom(imageUrl, {
         timeout,
-        maxRetries,
+        maxRetries
       });
 
       const duration = Date.now() - startTime;
@@ -446,18 +498,19 @@ export async function classifyRoomBatch(
         success: true,
         classification,
         error: null,
-        duration,
+        duration
       };
     } catch (error) {
       const duration = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
 
       return {
         imageUrl,
         success: false,
         classification: null,
         error: errorMessage,
-        duration,
+        duration
       };
     }
   };
@@ -465,7 +518,7 @@ export async function classifyRoomBatch(
   // Process in batches with concurrency control
   const results = await processBatch(imageUrls, processor, {
     concurrency,
-    onProgress,
+    onProgress
   });
 
   return results;
@@ -475,14 +528,14 @@ export async function classifyRoomBatch(
  * Get statistics from batch classification results
  */
 export function getBatchStatistics(results: BatchClassificationResult[]) {
-  const successful = results.filter(r => r.success).length;
-  const failed = results.filter(r => !r.success).length;
+  const successful = results.filter((r) => r.success).length;
+  const failed = results.filter((r) => !r.success).length;
   const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
   const avgDuration = results.length > 0 ? totalDuration / results.length : 0;
 
   // Count by category
   const categoryCount: Record<string, number> = {};
-  results.forEach(result => {
+  results.forEach((result) => {
     if (result.success && result.classification) {
       const category = result.classification.category;
       categoryCount[category] = (categoryCount[category] || 0) + 1;
@@ -491,11 +544,12 @@ export function getBatchStatistics(results: BatchClassificationResult[]) {
 
   // Average confidence
   const confidences = results
-    .filter(r => r.success && r.classification)
-    .map(r => r.classification!.confidence);
-  const avgConfidence = confidences.length > 0
-    ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
-    : 0;
+    .filter((r) => r.success && r.classification)
+    .map((r) => r.classification!.confidence);
+  const avgConfidence =
+    confidences.length > 0
+      ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
+      : 0;
 
   return {
     total: results.length,
@@ -505,7 +559,7 @@ export function getBatchStatistics(results: BatchClassificationResult[]) {
     totalDuration,
     avgDuration,
     avgConfidence,
-    categoryCount,
+    categoryCount
   };
 }
 
@@ -533,24 +587,24 @@ export const aiVisionService = {
   getBatchStatistics,
 
   /**
-   * Check if the service is properly configured
+   * Check if the service is properly configured (server-side only)
    */
   isConfigured: (): boolean => {
-    return !!(process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY);
+    return !!process.env.OPENAI_API_KEY;
   },
 
   /**
-   * Get service configuration status
+   * Get service configuration status (server-side only)
    */
   getStatus: (): { configured: boolean; message: string } => {
     const configured = aiVisionService.isConfigured();
     return {
       configured,
       message: configured
-        ? 'AI Vision service is ready'
-        : 'OpenAI API key not configured. Set OPENAI_API_KEY environment variable.',
+        ? "AI Vision service is ready"
+        : "OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
     };
-  },
+  }
 };
 
 // ============================================================================

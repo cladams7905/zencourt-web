@@ -1,23 +1,10 @@
 /**
  * Storage Service
  *
- * Handles file uploads to cloud storage.
- * Currently using mock implementation with local object URLs.
- *
- * TODO: Replace with Vercel Blob Storage when ready:
- * 1. Install: npm install @vercel/blob
- * 2. Add BLOB_READ_WRITE_TOKEN to .env.local
- * 3. Uncomment the Vercel Blob implementation below
+ * Handles file uploads via API routes to Vercel Blob Storage.
  */
 
-// import { put } from '@vercel/blob';
-
-export interface UploadResult {
-  id: string;
-  url: string;
-  status: "success" | "error";
-  error?: string;
-}
+import { UploadResult } from "@/types/images";
 
 export interface StorageService {
   uploadFile(file: File, folder: string): Promise<string>;
@@ -26,33 +13,36 @@ export interface StorageService {
 }
 
 /**
- * Upload a single file to storage
+ * Upload a single file to storage via API route
  * @param file - File to upload
  * @param folder - Folder path for organization (e.g., "projects/abc123")
  * @returns Public URL of the uploaded file
  */
 export async function uploadFile(file: File, folder: string): Promise<string> {
   try {
-    // MOCK IMPLEMENTATION - Replace with real storage
-    // Simulates upload delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
 
-    // Create a temporary object URL for preview purposes
-    const objectUrl = URL.createObjectURL(file);
-
-    // TODO: Replace with Vercel Blob Storage
-    /*
-    const blob = await put(`${folder}/${file.name}`, file, {
-      access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+    const response = await fetch("/api/blob", {
+      method: "PUT",
+      body: formData
     });
-    return blob.url;
-    */
 
-    return objectUrl;
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Upload failed");
+    }
+
+    return data.url;
   } catch (error) {
     console.error("Error uploading file:", error);
-    throw new Error(`Failed to upload ${file.name}`);
+    throw new Error(
+      `Failed to upload ${file.name}: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
 }
 
@@ -72,14 +62,14 @@ export async function uploadFiles(
       return {
         id: generateFileId(file),
         url,
-        status: "success" as const,
+        status: "success" as const
       };
     } catch (error) {
       return {
         id: generateFileId(file),
         url: "",
         status: "error" as const,
-        error: error instanceof Error ? error.message : "Upload failed",
+        error: error instanceof Error ? error.message : "Upload failed"
       };
     }
   });
@@ -88,27 +78,31 @@ export async function uploadFiles(
 }
 
 /**
- * Delete a file from storage
+ * Delete a file from storage via API route
  * @param url - URL of the file to delete
  */
 export async function deleteFile(url: string): Promise<void> {
   try {
-    // MOCK IMPLEMENTATION - Replace with real storage
-    // For object URLs, we can revoke them
-    if (url.startsWith("blob:")) {
-      URL.revokeObjectURL(url);
-    }
-
-    // TODO: Replace with Vercel Blob Storage
-    /*
-    import { del } from '@vercel/blob';
-    await del(url, {
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+    const response = await fetch("/api/blob", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ url })
     });
-    */
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Delete failed");
+    }
   } catch (error) {
     console.error("Error deleting file:", error);
-    throw new Error("Failed to delete file");
+    throw new Error(
+      `Failed to delete file: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
 }
 
@@ -121,13 +115,25 @@ function generateFileId(file: File): string {
 
 /**
  * Get the folder path for a project
+ * @param projectId - Project ID (can be temp-{timestamp} or final project name)
+ * @param userId - Optional user ID for user-scoped folders
  */
-export function getProjectFolder(projectId: string): string {
+export function getProjectFolder(projectId: string, userId?: string): string {
+  if (userId) {
+    return `${userId}/projects/${projectId}`;
+  }
   return `projects/${projectId}`;
+}
+
+/**
+ * Generate a temporary project ID
+ */
+export function generateTempProjectId(): string {
+  return `temp-${Date.now()}`;
 }
 
 export const storageService: StorageService = {
   uploadFile,
   uploadFiles,
-  deleteFile,
+  deleteFile
 };

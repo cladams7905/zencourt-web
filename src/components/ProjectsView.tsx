@@ -3,18 +3,8 @@ import { useState } from "react";
 import { EmptyState } from "./EmptyState";
 import { UploadProjectModal } from "./UploadProjectModal";
 import Image from "next/image";
-
-// Project type definition
-interface Project {
-  id: number;
-  title: string;
-  thumbnail: string;
-  duration: string;
-  status: string;
-  format: "vertical" | "landscape";
-  platform: string;
-  subtitles: boolean;
-}
+import { Project } from "@/types/schema";
+import HouseFallback from "@/../public/house_fallback.png";
 
 export function ProjectsView() {
   const [filter, setFilter] = useState<"all" | "vertical" | "landscape">("all");
@@ -119,23 +109,23 @@ export function ProjectsView() {
                 <>
                   {/* Blurred background - TikTok style */}
                   <Image
-                    src={project.thumbnail}
+                    src={project.thumbnailUrl || HouseFallback}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-60"
                   />
                   {/* Main centered vertical video */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <Image
-                      src={project.thumbnail}
-                      alt={project.title}
+                      src={project.thumbnailUrl || HouseFallback}
+                      alt={project.title || "Undefined"}
                       className="h-full w-auto object-cover"
                     />
                   </div>
                 </>
               ) : (
                 <Image
-                  src={project.thumbnail}
-                  alt={project.title}
+                  src={project.thumbnailUrl || HouseFallback}
+                  alt={project.title || "Undefined"}
                   className="w-full h-full object-cover"
                 />
               )}

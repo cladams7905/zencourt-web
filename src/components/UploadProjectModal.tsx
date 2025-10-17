@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useUser } from "@stackframe/stack";
 import {
   Dialog,
   DialogContent,
@@ -12,21 +13,12 @@ import { Button } from "./ui/button";
 import { DragDropZone } from "./DragDropZone";
 import { ImageUploadGrid } from "./shared/ImageUploadGrid";
 import { ImagePreviewModal } from "./modals/ImagePreviewModal";
-import { ImageData, createImageDataArray } from "@/types/image";
+import { createImageDataArray } from "@/db/actions/images";
 import { uploadFiles, getProjectFolder } from "@/services/storage";
 import { processImages } from "@/services/imageProcessor";
-import type { ProcessedImage } from "@/services/imageProcessor";
-
-interface Project {
-  id: number;
-  title: string;
-  thumbnail: string;
-  duration: string;
-  status: string;
-  format: "vertical" | "landscape";
-  platform: string;
-  subtitles: boolean;
-}
+import { createNeonClient } from "@/lib/neon/client";
+import { Project } from "@/types/schema";
+import type { ProcessedImage } from "@/types/images";
 
 interface UploadProjectModalProps {
   isOpen: boolean;
@@ -39,20 +31,64 @@ export function UploadProjectModal({
   onClose,
   onProjectCreated
 }: UploadProjectModalProps) {
+  const user = useUser();
   const [step, setStep] = useState<
     "upload" | "categorizing" | "review" | "naming"
   >("upload");
-  const [images, setImages] = useState<ImageData[]>([]);
+  const [images, setImages] = useState<ProcessedImage[]>([]);
   const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [previewImage, setPreviewImage] = useState<ImageData | null>(null);
+  const [previewImage, setPreviewImage] = useState<ProcessedImage | null>(null);
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [internalIsOpen, setInternalIsOpen] = useState(isOpen);
+  const [currentProject, setCurrentProject] = useState<Project | null>(null);
 
   // Sync external isOpen prop with internal state
   useEffect(() => {
     setInternalIsOpen(isOpen);
   }, [isOpen]);
+
+  // Create a new project when modal opens
+  useEffect(() => {
+    const createProject = async () => {
+      if (!isOpen || !user || currentProject) return;
+
+      try {
+        const authJson = await user.getAuthJson();
+        if (!authJson.accessToken) {
+          console.error("No access token available");
+          return;
+        }
+
+        const neon = createNeonClient(authJson.accessToken);
+
+        // Create project in database
+        const projectId = `${user.id}_${Date.now()}`;
+        const { data, error } = await neon
+          .from("projects")
+          .insert({
+            id: projectId,
+            user_id: user.id,
+            title: "Untitled Project",
+            status: "uploading"
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Error creating project:", error);
+          return;
+        }
+
+        setCurrentProject(data as Project);
+        console.log("Project created:", data);
+      } catch (error) {
+        console.error("Failed to create project:", error);
+      }
+    };
+
+    createProject();
+  }, [isOpen, user, currentProject]);
 
   const handleFilesSelected = async (files: File[]) => {
     setIsLoadingPreviews(true);
@@ -94,13 +130,17 @@ export function UploadProjectModal({
     }
   };
 
-  const handleUploadImages = async (imageDataArray: ImageData[]) => {
+  const handleUploadImages = async (imageDataArray: ProcessedImage[]) => {
+    if (!currentProject || !user) {
+      console.error("No project or user available");
+      return;
+    }
+
     setIsUploading(true);
 
     try {
-      // Generate a temporary project ID for folder organization
-      const projectId = `temp-${Date.now()}`;
-      const folder = getProjectFolder(projectId);
+      // Use the project ID and user ID for folder structure
+      const folder = getProjectFolder(currentProject.id, user.id);
 
       // Upload images one by one with status updates
       for (let i = 0; i < imageDataArray.length; i++) {
@@ -110,7 +150,7 @@ export function UploadProjectModal({
         setImages((prev) =>
           prev.map((img) =>
             img.id === imageData.id
-              ? { ...img, uploadStatus: "uploading" as const }
+              ? { ...img, status: "uploading" as const }
               : img
           )
         );
@@ -127,7 +167,7 @@ export function UploadProjectModal({
                 img.id === imageData.id
                   ? {
                       ...img,
-                      uploadStatus: "uploaded" as const,
+                      status: "uploaded" as const,
                       uploadUrl: result.url
                     }
                   : img
@@ -140,7 +180,7 @@ export function UploadProjectModal({
                 img.id === imageData.id
                   ? {
                       ...img,
-                      uploadStatus: "error" as const,
+                      status: "error" as const,
                       error: result.error
                     }
                   : img
@@ -154,7 +194,7 @@ export function UploadProjectModal({
               img.id === imageData.id
                 ? {
                     ...img,
-                    uploadStatus: "error" as const,
+                    status: "error" as const,
                     error:
                       error instanceof Error ? error.message : "Upload failed"
                   }
@@ -175,16 +215,15 @@ export function UploadProjectModal({
 
   const handleRetryUpload = async (imageId: string) => {
     const imageToRetry = images.find((img) => img.id === imageId);
-    if (!imageToRetry) return;
+    if (!imageToRetry || !currentProject || !user) return;
 
-    const projectId = `temp-${Date.now()}`;
-    const folder = getProjectFolder(projectId);
+    const folder = getProjectFolder(currentProject.id, user.id);
 
     // Update status to uploading
     setImages((prev) =>
       prev.map((img) =>
         img.id === imageId
-          ? { ...img, uploadStatus: "uploading" as const, error: undefined }
+          ? { ...img, status: "uploading" as const, error: undefined }
           : img
       )
     );
@@ -199,7 +238,7 @@ export function UploadProjectModal({
             img.id === imageId
               ? {
                   ...img,
-                  uploadStatus: "uploaded" as const,
+                  status: "uploaded" as const,
                   uploadUrl: result.url
                 }
               : img
@@ -209,7 +248,7 @@ export function UploadProjectModal({
         setImages((prev) =>
           prev.map((img) =>
             img.id === imageId
-              ? { ...img, uploadStatus: "error" as const, error: result.error }
+              ? { ...img, status: "error" as const, error: result.error }
               : img
           )
         );
@@ -220,7 +259,7 @@ export function UploadProjectModal({
           img.id === imageId
             ? {
                 ...img,
-                uploadStatus: "error" as const,
+                status: "error" as const,
                 error: error instanceof Error ? error.message : "Upload failed"
               }
             : img
@@ -249,8 +288,13 @@ export function UploadProjectModal({
   };
 
   const handleContinue = async () => {
+    if (!currentProject) {
+      console.error("No project available");
+      return;
+    }
+
     // Check if all images are uploaded successfully
-    const allUploaded = images.every((img) => img.uploadStatus === "uploaded");
+    const allUploaded = images.every((img) => img.status === "uploaded");
     if (!allUploaded) {
       console.warn("Not all images are uploaded yet");
       return;
@@ -260,10 +304,8 @@ export function UploadProjectModal({
     setStep("categorizing");
 
     try {
-      const projectId = `temp-${Date.now()}`;
-
-      // Process images with AI categorization using the full ImageData objects
-      const result = await processImages(images, projectId, {
+      // Process images with AI categorization using the current project ID
+      const result = await processImages(images, currentProject.id, {
         onProgress: (progress) => {
           console.log(
             `Processing: ${progress.phase} - ${progress.overallProgress}%`
@@ -284,12 +326,10 @@ export function UploadProjectModal({
 
   // Check if we can continue (at least one uploaded image)
   const canContinue =
-    images.length > 0 && images.some((img) => img.uploadStatus === "uploaded");
+    images.length > 0 && images.some((img) => img.status === "uploaded");
   const allUploadedOrError =
     images.length > 0 &&
-    images.every(
-      (img) => img.uploadStatus === "uploaded" || img.uploadStatus === "error"
-    );
+    images.every((img) => img.status === "uploaded" || img.status === "error");
 
   return (
     <Dialog open={internalIsOpen} onOpenChange={onClose}>
@@ -348,9 +388,8 @@ export function UploadProjectModal({
                         : !allUploadedOrError
                         ? "Waiting for uploads to complete..."
                         : `Continue with ${
-                            images.filter(
-                              (img) => img.uploadStatus === "uploaded"
-                            ).length
+                            images.filter((img) => img.status === "uploaded")
+                              .length
                           } image(s)`}
                     </Button>
                   </div>

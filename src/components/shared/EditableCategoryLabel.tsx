@@ -5,11 +5,11 @@
  * and a dropdown to select from predefined categories.
  */
 
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
-import { Check, X, Edit2, ChevronDown } from 'lucide-react';
-import { ROOM_CATEGORIES, type RoomCategory } from '@/services/categorization';
+import { useState, useRef, useEffect } from "react";
+import { Check, X, Edit2, ChevronDown } from "lucide-react";
+import { ROOM_CATEGORIES, type RoomCategory } from "@/types/roomCategory";
 
 // ============================================================================
 // Types and Interfaces
@@ -45,7 +45,7 @@ export function EditableCategoryLabel({
   onRename,
   editable = true,
   showCategorySelector = true,
-  className = '',
+  className = ""
 }: EditableCategoryLabelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(currentLabel);
@@ -66,14 +66,18 @@ export function EditableCategoryLabel({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
 
     if (showDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showDropdown]);
 
@@ -82,20 +86,23 @@ export function EditableCategoryLabel({
     const trimmed = label.trim();
 
     if (!trimmed) {
-      return { isValid: false, error: 'Label cannot be empty' };
+      return { isValid: false, error: "Label cannot be empty" };
     }
 
     if (trimmed.length < 2) {
-      return { isValid: false, error: 'Label must be at least 2 characters' };
+      return { isValid: false, error: "Label must be at least 2 characters" };
     }
 
     if (trimmed.length > 50) {
-      return { isValid: false, error: 'Label must be less than 50 characters' };
+      return { isValid: false, error: "Label must be less than 50 characters" };
     }
 
     // Check for invalid characters
     if (!/^[a-zA-Z0-9\s\-\/]+$/.test(trimmed)) {
-      return { isValid: false, error: 'Only letters, numbers, spaces, hyphens, and slashes allowed' };
+      return {
+        isValid: false,
+        error: "Only letters, numbers, spaces, hyphens, and slashes allowed"
+      };
     }
 
     return { isValid: true };
@@ -106,7 +113,7 @@ export function EditableCategoryLabel({
     const validation = validateLabel(editValue);
 
     if (!validation.isValid) {
-      setValidationError(validation.error || 'Invalid label');
+      setValidationError(validation.error || "Invalid label");
       return;
     }
 
@@ -136,9 +143,9 @@ export function EditableCategoryLabel({
 
   // Handle key press in input
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSave();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       handleCancel();
     }
   };
@@ -152,7 +159,7 @@ export function EditableCategoryLabel({
       }
       acc[category.group].push(category);
       return acc;
-    }, {} as Record<string, typeof ROOM_CATEGORIES[RoomCategory][]>);
+    }, {} as Record<string, (typeof ROOM_CATEGORIES)[RoomCategory][]>);
 
   // Editing mode
   if (isEditing) {
@@ -168,7 +175,7 @@ export function EditableCategoryLabel({
           }}
           onKeyDown={handleKeyDown}
           className={`px-2 py-1 border rounded text-sm ${
-            validationError ? 'border-red-500' : 'border-gray-300'
+            validationError ? "border-red-500" : "border-gray-300"
           } focus:outline-none focus:ring-2 focus:ring-blue-500`}
           placeholder="Enter category name"
         />
@@ -228,34 +235,42 @@ export function EditableCategoryLabel({
                       Change to:
                     </div>
 
-                    {Object.entries(categoriesByGroup).map(([groupName, categories]) => (
-                      <div key={groupName} className="mb-3">
-                        <div className="text-xs font-medium text-gray-400 uppercase mb-1 px-2">
-                          {groupName}
+                    {Object.entries(categoriesByGroup).map(
+                      ([groupName, categories]) => (
+                        <div key={groupName} className="mb-3">
+                          <div className="text-xs font-medium text-gray-400 uppercase mb-1 px-2">
+                            {groupName}
+                          </div>
+                          <div className="space-y-0.5">
+                            {categories.map((category) => (
+                              <button
+                                key={category.id}
+                                onClick={() =>
+                                  handleSelectCategory(category.id)
+                                }
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 ${
+                                  category.id === categoryId
+                                    ? "bg-blue-50 text-blue-700"
+                                    : ""
+                                }`}
+                                disabled={category.id === categoryId}
+                              >
+                                <div
+                                  className="w-3 h-3 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: category.color }}
+                                />
+                                <span className="text-left">
+                                  {category.label}
+                                </span>
+                                {category.id === categoryId && (
+                                  <Check className="w-3 h-3 ml-auto" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <div className="space-y-0.5">
-                          {categories.map((category) => (
-                            <button
-                              key={category.id}
-                              onClick={() => handleSelectCategory(category.id)}
-                              className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 ${
-                                category.id === categoryId ? 'bg-blue-50 text-blue-700' : ''
-                              }`}
-                              disabled={category.id === categoryId}
-                            >
-                              <div
-                                className="w-3 h-3 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: category.color }}
-                              />
-                              <span className="text-left">{category.label}</span>
-                              {category.id === categoryId && (
-                                <Check className="w-3 h-3 ml-auto" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 </div>
               )}
@@ -274,8 +289,11 @@ export function EditableCategoryLabel({
 export function CompactEditableCategoryLabel({
   currentLabel,
   categoryId,
-  onRename,
-}: Omit<EditableCategoryLabelProps, 'editable' | 'showCategorySelector' | 'className'>) {
+  onRename
+}: Omit<
+  EditableCategoryLabelProps,
+  "editable" | "showCategorySelector" | "className"
+>) {
   return (
     <EditableCategoryLabel
       currentLabel={currentLabel}

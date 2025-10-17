@@ -8,11 +8,11 @@
 "use client";
 
 import { Loader2, X, AlertCircle, CheckCircle, RotateCw } from "lucide-react";
-import type { ImageData } from "@/types/image";
+import type { ProcessedImage } from "@/types/images";
 import Image from "next/image";
 
 interface ImageUploadGridProps {
-  images: ImageData[];
+  images: ProcessedImage[];
   onRemove: (imageId: string) => void;
   onRetry?: (imageId: string) => void;
   onImageClick?: (imageId: string) => void;
@@ -68,20 +68,20 @@ export function ImageUploadGrid({
             </button>
 
             {/* Upload Status Overlay */}
-            {image.uploadStatus === "uploading" && (
+            {image.status === "uploading" && (
               <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
                 <Loader2 className="w-8 h-8 text-white animate-spin" />
                 <span className="text-xs text-white mt-2">Uploading...</span>
               </div>
             )}
 
-            {image.uploadStatus === "uploaded" && (
+            {image.status === "uploaded" && (
               <div className="absolute top-2 left-2 z-10 p-1 bg-black/50 rounded-full">
                 <CheckCircle className="w-4 h-4 text-white" />
               </div>
             )}
 
-            {image.uploadStatus === "error" && (
+            {image.status === "error" && (
               <div className="absolute inset-0 bg-red-500/90 flex flex-col items-center justify-center">
                 <AlertCircle className="w-8 h-8 text-white mb-2" />
                 <span className="text-xs text-white text-center px-2 mb-2">

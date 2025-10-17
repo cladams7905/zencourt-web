@@ -1,28 +1,4 @@
-/**
- * Image data types for upload and processing
- */
-
-export type UploadStatus = "pending" | "uploading" | "uploaded" | "error";
-
-export interface ImageData {
-  id: string;
-  file: File;
-  previewUrl: string;
-  uploadStatus: UploadStatus;
-  uploadUrl?: string;
-  category?: string;
-  confidence?: number;
-  error?: string;
-  metadata?: ImageMetadata;
-}
-
-export interface ImageMetadata {
-  width: number;
-  height: number;
-  format: string;
-  size: number;
-  lastModified: number;
-}
+import { ProcessedImage, ImageMetadata } from "@/types/images";
 
 /**
  * Generate a preview URL from a File object using FileReader
@@ -68,7 +44,7 @@ export async function getImageMetadata(
         height: img.height,
         format: file.type,
         size: file.size,
-        lastModified: file.lastModified,
+        lastModified: file.lastModified
       });
     };
 
@@ -81,11 +57,11 @@ export async function getImageMetadata(
 }
 
 /**
- * Create ImageData object from a File
+ * Create ProcessedImage object from a File
  * @param file - The image file
- * @returns Promise that resolves to ImageData
+ * @returns Promise that resolves to ProcessedImage
  */
-export async function createImageData(file: File): Promise<ImageData> {
+export async function createImageData(file: File): Promise<ProcessedImage> {
   const id = `${file.name}-${file.size}-${file.lastModified}`;
   const previewUrl = await generatePreviewUrl(file);
   const metadata = await getImageMetadata(file, previewUrl);
@@ -94,17 +70,19 @@ export async function createImageData(file: File): Promise<ImageData> {
     id,
     file,
     previewUrl,
-    uploadStatus: "pending",
-    metadata,
+    status: "pending",
+    metadata
   };
 }
 
 /**
- * Create multiple ImageData objects from an array of Files
+ * Create multiple ProcessedImage objects from an array of Files
  * @param files - Array of image files
- * @returns Promise that resolves to array of ImageData
+ * @returns Promise that resolves to array of ProcessedImage
  */
-export async function createImageDataArray(files: File[]): Promise<ImageData[]> {
+export async function createImageDataArray(
+  files: File[]
+): Promise<ProcessedImage[]> {
   const promises = files.map((file) => createImageData(file));
   return Promise.all(promises);
 }

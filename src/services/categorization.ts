@@ -4,180 +4,18 @@
  * Provides utilities for categorizing and organizing property images
  * by room type with intelligent numbering and sorting.
  */
-
-import type { RoomCategory } from '@/services/aiVision';
-import type { ProcessedImage } from '@/services/imageProcessor';
-
-// Re-export RoomCategory for convenience
-export type { RoomCategory } from '@/services/aiVision';
-
-// ============================================================================
-// Room Categories Configuration
-// ============================================================================
-
-/**
- * Category metadata for display and organization
- */
-export interface RoomCategoryMetadata {
-  /** Internal category ID */
-  id: RoomCategory;
-  /** Display label */
-  label: string;
-  /** Lucide icon name */
-  icon: string;
-  /** Display order (lower = first) */
-  order: number;
-  /** Category color for UI */
-  color: string;
-  /** Whether this category should be numbered when duplicates exist */
-  allowNumbering: boolean;
-  /** Category group for organization */
-  group: 'exterior' | 'living' | 'private' | 'utility' | 'other';
-}
-
-/**
- * Complete room categories configuration
- * Ordered logically for property walkthroughs
- */
-export const ROOM_CATEGORIES: Record<RoomCategory, RoomCategoryMetadata> = {
-  'exterior-front': {
-    id: 'exterior-front',
-    label: 'Exterior - Front',
-    icon: 'Home',
-    order: 1,
-    color: '#10b981', // green-500
-    allowNumbering: false,
-    group: 'exterior',
-  },
-  'exterior-backyard': {
-    id: 'exterior-backyard',
-    label: 'Exterior - Backyard',
-    icon: 'Trees',
-    order: 2,
-    color: '#059669', // green-600
-    allowNumbering: false,
-    group: 'exterior',
-  },
-  'living-room': {
-    id: 'living-room',
-    label: 'Living Room',
-    icon: 'Sofa',
-    order: 3,
-    color: '#3b82f6', // blue-500
-    allowNumbering: false,
-    group: 'living',
-  },
-  'dining-room': {
-    id: 'dining-room',
-    label: 'Dining Room',
-    icon: 'Utensils',
-    order: 4,
-    color: '#8b5cf6', // violet-500
-    allowNumbering: false,
-    group: 'living',
-  },
-  'kitchen': {
-    id: 'kitchen',
-    label: 'Kitchen',
-    icon: 'ChefHat',
-    order: 5,
-    color: '#f59e0b', // amber-500
-    allowNumbering: false,
-    group: 'living',
-  },
-  'bedroom': {
-    id: 'bedroom',
-    label: 'Bedroom',
-    icon: 'Bed',
-    order: 6,
-    color: '#ec4899', // pink-500
-    allowNumbering: true,
-    group: 'private',
-  },
-  'bathroom': {
-    id: 'bathroom',
-    label: 'Bathroom',
-    icon: 'Bath',
-    order: 7,
-    color: '#06b6d4', // cyan-500
-    allowNumbering: true,
-    group: 'private',
-  },
-  'office': {
-    id: 'office',
-    label: 'Office/Study',
-    icon: 'Briefcase',
-    order: 8,
-    color: '#14b8a6', // teal-500
-    allowNumbering: false,
-    group: 'private',
-  },
-  'laundry-room': {
-    id: 'laundry-room',
-    label: 'Laundry Room',
-    icon: 'WashingMachine',
-    order: 9,
-    color: '#a855f7', // purple-500
-    allowNumbering: false,
-    group: 'utility',
-  },
-  'garage': {
-    id: 'garage',
-    label: 'Garage',
-    icon: 'Car',
-    order: 10,
-    color: '#6366f1', // indigo-500
-    allowNumbering: false,
-    group: 'utility',
-  },
-  'basement': {
-    id: 'basement',
-    label: 'Basement',
-    icon: 'Warehouse',
-    order: 11,
-    color: '#64748b', // slate-500
-    allowNumbering: false,
-    group: 'utility',
-  },
-  'other': {
-    id: 'other',
-    label: 'Other',
-    icon: 'MoreHorizontal',
-    order: 12,
-    color: '#94a3b8', // slate-400
-    allowNumbering: false,
-    group: 'other',
-  },
-};
-
-// ============================================================================
-// Categorized Images Structure
-// ============================================================================
-
-/**
- * A category with its images and display metadata
- */
-export interface CategorizedGroup {
-  /** Category ID */
-  category: RoomCategory;
-  /** Display label (may include numbering, e.g., "Bedroom 1") */
-  displayLabel: string;
-  /** Original category label */
-  baseLabel: string;
-  /** Room number (if applicable, e.g., 1, 2, 3) */
-  roomNumber?: number;
-  /** Category metadata */
-  metadata: RoomCategoryMetadata;
-  /** Images in this category */
-  images: ProcessedImage[];
-  /** Average confidence of classifications */
-  avgConfidence: number;
-}
+import type { ProcessedImage } from "@/types/images";
+import {
+  CategorizedGroup,
+  ROOM_CATEGORIES,
+  RoomCategory,
+  RoomCategoryMetadata
+} from "@/types/roomCategory";
 
 /**
  * Organized categories result
  */
-export interface OrganizedCategories {
+interface OrganizedCategories {
   /** All category groups, sorted by display order */
   groups: CategorizedGroup[];
   /** Total number of images */
@@ -187,10 +25,6 @@ export interface OrganizedCategories {
   /** Images grouped by category for easy lookup */
   byCategory: Record<string, ProcessedImage[]>;
 }
-
-// ============================================================================
-// Categorization Functions
-// ============================================================================
 
 /**
  * Categorize and organize images with intelligent numbering
@@ -213,7 +47,7 @@ export function categorizeAndOrganizeImages(
   const {
     minConfidence = 0,
     moveLowConfidenceToOther = true,
-    lowConfidenceThreshold = 0.5,
+    lowConfidenceThreshold = 0.5
   } = options;
 
   // Filter and group images by category
@@ -232,9 +66,9 @@ export function categorizeAndOrganizeImages(
     if (
       moveLowConfidenceToOther &&
       confidence < lowConfidenceThreshold &&
-      category !== 'other'
+      category !== "other"
     ) {
-      category = 'other';
+      category = "other";
     }
 
     if (!groupedByCategory[category]) {
@@ -274,7 +108,7 @@ export function categorizeAndOrganizeImages(
           roomNumber,
           metadata,
           images: [image],
-          avgConfidence: image.classification?.confidence || 0,
+          avgConfidence: image.classification?.confidence || 0
         });
       });
     } else {
@@ -285,7 +119,7 @@ export function categorizeAndOrganizeImages(
         baseLabel: metadata.label,
         metadata,
         images: categoryImages,
-        avgConfidence,
+        avgConfidence
       });
     }
   });
@@ -307,14 +141,16 @@ export function categorizeAndOrganizeImages(
     groups: categorizedGroups,
     totalImages: images.filter((img) => img.classification).length,
     categoryCount: Object.keys(groupedByCategory).length,
-    byCategory: groupedByCategory,
+    byCategory: groupedByCategory
   };
 }
 
 /**
  * Get category metadata by ID
  */
-export function getCategoryMetadata(category: RoomCategory): RoomCategoryMetadata {
+export function getCategoryMetadata(
+  category: RoomCategory
+): RoomCategoryMetadata {
   return ROOM_CATEGORIES[category];
 }
 
@@ -334,7 +170,7 @@ export function getCategoriesByGroup(): Record<string, RoomCategoryMetadata[]> {
     living: [],
     private: [],
     utility: [],
-    other: [],
+    other: []
   };
 
   Object.values(ROOM_CATEGORIES).forEach((category) => {
@@ -360,7 +196,7 @@ export function countImagesByGroup(
     living: 0,
     private: 0,
     utility: 0,
-    other: 0,
+    other: 0
   };
 
   organized.groups.forEach((group) => {
@@ -382,7 +218,7 @@ export function filterByConfidence(
       ...group,
       images: group.images.filter(
         (img) => (img.classification?.confidence || 0) >= minConfidence
-      ),
+      )
     }))
     .filter((group) => group.images.length > 0);
 
@@ -404,7 +240,7 @@ export function filterByConfidence(
     groups: filteredGroups,
     totalImages,
     categoryCount: filteredGroups.length,
-    byCategory,
+    byCategory
   };
 }
 
@@ -430,12 +266,12 @@ export function reorderImagesInCategory(
 
   newGroups[categoryIndex] = {
     ...group,
-    images: newImages,
+    images: newImages
   };
 
   return {
     ...organized,
-    groups: newGroups,
+    groups: newGroups
   };
 }
 
@@ -465,15 +301,15 @@ export function moveImageBetweenCategories(
     ...movedImage,
     classification: {
       ...movedImage.classification!,
-      category: toGroup.category,
-    },
+      category: toGroup.category
+    }
   };
 
   const newToImages = [...toGroup.images, updatedImage];
 
   newGroups[fromCategoryIndex] = {
     ...fromGroup,
-    images: newFromImages,
+    images: newFromImages
   };
 
   newGroups[toCategoryIndex] = {
@@ -483,7 +319,7 @@ export function moveImageBetweenCategories(
       newToImages.reduce(
         (sum, img) => sum + (img.classification?.confidence || 0),
         0
-      ) / newToImages.length,
+      ) / newToImages.length
   };
 
   // Remove empty groups
@@ -492,7 +328,7 @@ export function moveImageBetweenCategories(
   return {
     ...organized,
     groups: filteredGroups,
-    categoryCount: filteredGroups.length,
+    categoryCount: filteredGroups.length
   };
 }
 
@@ -513,7 +349,7 @@ export function getCategorySummary(organized: OrganizedCategories) {
     avgImagesPerCategory:
       organized.categoryCount > 0
         ? organized.totalImages / organized.categoryCount
-        : 0,
+        : 0
   };
 }
 
@@ -527,6 +363,6 @@ export function exportCategorization(organized: OrganizedCategories) {
     roomNumber: group.roomNumber,
     imageIds: group.images.map((img) => img.id),
     imageCount: group.images.length,
-    avgConfidence: group.avgConfidence,
+    avgConfidence: group.avgConfidence
   }));
 }

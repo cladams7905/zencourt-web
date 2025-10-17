@@ -16,7 +16,7 @@ import {
   ZoomOut,
   Download
 } from "lucide-react";
-import type { ProcessedImage } from "@/services/imageProcessor";
+import type { ProcessedImage } from "@/types/images";
 import Image from "next/image";
 
 // ============================================================================

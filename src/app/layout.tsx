@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { StackProvider, StackTheme } from "@stackframe/stack";
-import { stackClientApp } from "../stack/client";
+import { stackClientApp } from "../lib/stack/client";
 import "./globals.css";
 
 export const metadata: Metadata = {
