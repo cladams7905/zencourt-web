@@ -324,6 +324,7 @@ export type BatchProgressCallback = (
 
 /**
  * Helper function to process items in batches with concurrency control
+ * Reports progress as each item completes, not just after chunks
  */
 async function processBatch<T, R>(
   items: T[],
@@ -340,21 +341,27 @@ async function processBatch<T, R>(
   // Process items in chunks
   for (let i = 0; i < items.length; i += concurrency) {
     const chunk = items.slice(i, i + concurrency);
+
+    // Wrap each processor call to report progress immediately when it completes
     const chunkResults = await Promise.allSettled(
-      chunk.map((item) => processor(item))
+      chunk.map(async (item) => {
+        const result = await processor(item);
+        completed++;
+
+        // Report progress immediately after this item completes
+        if (onProgress) {
+          onProgress(completed, items.length, result);
+        }
+
+        return result;
+      })
     );
 
-    // Process results
+    // Collect results (progress already reported above)
     for (const result of chunkResults) {
       const processedResult =
         result.status === "fulfilled" ? result.value : result.reason;
-
       results.push(processedResult);
-      completed++;
-
-      if (onProgress) {
-        onProgress(completed, items.length, processedResult);
-      }
     }
   }
 

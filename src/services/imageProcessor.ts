@@ -12,17 +12,14 @@
  */
 
 import { uploadFiles, getProjectFolder } from "./storage";
-import {
-  classifyRoomBatch,
-  getBatchStatistics,
-  type BatchClassificationResult
-} from "./aiVision";
+import { classifyRoomBatch } from "./aiVision";
 import type {
   ProcessedImage,
   ProcessingPhase,
   ProgressCallback,
   ProcessingResult,
-  CategorizedImages
+  CategorizedImages,
+  ImageMetadata
 } from "@/types/images";
 
 // ============================================================================
@@ -55,7 +52,7 @@ export class ImageProcessingError extends Error {
  * @param options - Processing options
  * @returns Promise<ProcessingResult> - Complete processing results
  */
-export async function processImages(
+async function processImages(
   imageDataList: ProcessedImage[],
   projectId: string,
   options: {
@@ -65,24 +62,43 @@ export async function processImages(
     aiConcurrency?: number;
     /** Skip AI analysis (upload only) */
     skipAnalysis?: boolean;
+    /** User ID for upload folder structure (required if images need uploading) */
+    userId?: string;
   } = {}
 ): Promise<ProcessingResult> {
-  const { onProgress, aiConcurrency = 10, skipAnalysis = false } = options;
+  const {
+    onProgress,
+    aiConcurrency = 10,
+    skipAnalysis = false,
+    userId
+  } = options;
   const startTime = Date.now();
 
-  // Initialize processed images array
-  const processedImages: ProcessedImage[] = imageDataList.map((img) => ({
-    id: img.id,
-    file: img.file,
-    previewUrl: img.previewUrl,
-    status: "pending" as const
-  }));
+  // Check if images are already uploaded
+  const alreadyUploaded = imageDataList.every(
+    (img) => img.status === "uploaded" && img.uploadUrl
+  );
 
-  try {
+  let uploadedImages: ProcessedImage[];
+
+  if (alreadyUploaded) {
+    // Skip upload phase - images are already uploaded
+    uploadedImages = imageDataList;
+    console.log("Images already uploaded, skipping upload phase");
+  } else {
+    // Initialize processed images array for upload
+    const processedImages: ProcessedImage[] = imageDataList.map((img) => ({
+      id: img.id,
+      file: img.file,
+      previewUrl: img.previewUrl,
+      status: "pending" as const
+    }));
+
     // Phase 1: Upload images
-    const uploadedImages = await uploadImages(
+    uploadedImages = await uploadImages(
       processedImages,
       projectId,
+      userId,
       (completed, total) => {
         if (onProgress) {
           onProgress({
@@ -96,7 +112,9 @@ export async function processImages(
         }
       }
     );
+  }
 
+  try {
     // If skipping analysis, return early
     if (skipAnalysis) {
       const duration = Date.now() - startTime;
@@ -191,9 +209,13 @@ export async function processImages(
 async function uploadImages(
   images: ProcessedImage[],
   projectId: string,
+  userId: string | undefined,
   onProgress?: (completed: number, total: number) => void
 ): Promise<ProcessedImage[]> {
-  const folder = getProjectFolder(projectId);
+  if (!userId) {
+    throw new Error("User ID is required for uploading images");
+  }
+  const folder = getProjectFolder(projectId, userId);
   const files = images.map((img) => img.file);
 
   // Update all to uploading status
@@ -267,7 +289,7 @@ async function analyzeImages(
   const imageUrls = uploadedImages.map((img) => img.uploadUrl!);
 
   // Classify in batch
-  const batchResults = await classifyRoomBatch(imageUrls, {
+  await classifyRoomBatch(imageUrls, {
     concurrency,
     onProgress: (completed, total, batchResult) => {
       // Find corresponding image
@@ -285,8 +307,9 @@ async function analyzeImages(
           image.error = batchResult.error || "Analysis failed";
         }
 
+        // Call progress callback with updated image
         if (onProgress) {
-          onProgress(completed, total, image);
+          onProgress(completed, total, { ...image });
         }
       }
     }
@@ -364,7 +387,7 @@ function calculateStats(images: ProcessedImage[], duration: number) {
 /**
  * Validate image files before processing
  */
-export function validateImageFiles(files: File[]): {
+function validateImageFiles(files: File[]): {
   valid: File[];
   invalid: Array<{ file: File; reason: string }>;
 } {
@@ -413,7 +436,7 @@ export function validateImageFiles(files: File[]): {
 /**
  * Estimate processing time based on image count
  */
-export function estimateProcessingTime(
+function estimateProcessingTime(
   imageCount: number,
   concurrency: number = 10
 ): number {
@@ -427,6 +450,91 @@ export function estimateProcessingTime(
   const totalAnalysisTime = batches * analysisTimePerBatch;
 
   return uploadTime + totalAnalysisTime;
+}
+
+/**
+ * Generate a preview URL from a File object using FileReader
+ * @param file - The image file
+ * @returns Promise that resolves to the preview URL
+ */
+async function generatePreviewUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        resolve(event.target.result as string);
+      } else {
+        reject(new Error("Failed to read file"));
+      }
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Error reading file"));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Get image metadata (dimensions, format, size)
+ * @param file - The image file
+ * @param previewUrl - The preview URL (data URL or object URL)
+ * @returns Promise that resolves to image metadata
+ */
+async function getImageMetadata(
+  file: File,
+  previewUrl: string
+): Promise<ImageMetadata> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => {
+      resolve({
+        width: img.width,
+        height: img.height,
+        format: file.type,
+        size: file.size,
+        lastModified: file.lastModified
+      });
+    };
+
+    img.onerror = () => {
+      reject(new Error("Failed to load image"));
+    };
+
+    img.src = previewUrl;
+  });
+}
+
+/**
+ * Create ProcessedImage object from a File
+ * @param file - The image file
+ * @returns Promise that resolves to ProcessedImage
+ */
+async function createImageData(file: File): Promise<ProcessedImage> {
+  const id = `${file.name}-${file.size}-${file.lastModified}`;
+  const previewUrl = await generatePreviewUrl(file);
+  const metadata = await getImageMetadata(file, previewUrl);
+
+  return {
+    id,
+    file,
+    previewUrl,
+    status: "pending",
+    metadata
+  };
+}
+
+/**
+ * Create multiple ProcessedImage objects from an array of Files
+ * @param files - Array of image files
+ * @returns Promise that resolves to array of ProcessedImage
+ */
+async function createImageDataArray(files: File[]): Promise<ProcessedImage[]> {
+  const promises = files.map((file) => createImageData(file));
+  return Promise.all(promises);
 }
 
 // ============================================================================
@@ -455,7 +563,12 @@ export const imageProcessorService = {
   /**
    * Categorize already processed images
    */
-  categorizeImages
+  categorizeImages,
+
+  /**
+   * Create multiple ProcessedImage objects from an array of Files
+   */
+  createImageDataArray
 };
 
 // ============================================================================

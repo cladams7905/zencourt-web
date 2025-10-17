@@ -516,7 +516,7 @@ function ImageThumbnail({
         } ${isSelected ? "ring-4 ring-blue-500" : ""}`}
       >
         <Image
-          src={image.previewUrl}
+          src={image.uploadUrl || image.previewUrl}
           alt={category}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -559,7 +559,7 @@ function ImageThumbnail({
         )}
 
         {!isLoading && !isError && onClick && (
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+          <div className="absolute inset-0 bg-opacity-0 group-hover:bg-black/30 transition-all flex items-center justify-center">
             <Icons.Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         )}

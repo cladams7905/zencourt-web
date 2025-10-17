@@ -116,13 +116,16 @@ function generateFileId(file: File): string {
 /**
  * Get the folder path for a project
  * @param projectId - Project ID (can be temp-{timestamp} or final project name)
- * @param userId - Optional user ID for user-scoped folders
+ * @param userId - User ID for user-scoped folders (required)
+ * @throws Error if userId is not provided
  */
-export function getProjectFolder(projectId: string, userId?: string): string {
-  if (userId) {
-    return `${userId}/projects/${projectId}`;
+export function getProjectFolder(projectId: string, userId: string): string {
+  if (!userId) {
+    throw new Error(
+      "User ID is required for project folder. Cannot upload without authentication."
+    );
   }
-  return `projects/${projectId}`;
+  return `user_${userId}/projects/project_${projectId}`;
 }
 
 /**

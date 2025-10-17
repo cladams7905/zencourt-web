@@ -139,7 +139,7 @@ export function DragDropZone({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full pb-6">
       <input
         ref={fileInputRef}
         type="file"

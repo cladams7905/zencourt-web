@@ -311,7 +311,7 @@ export function ImagePreviewModal({
                           (feature, index) => (
                             <span
                               key={index}
-                              className="px-2 py-1 bg-white bg-opacity/10 rounded text-xs"
+                              className="px-2 py-1 bg-white text-black bg-opacity/10 rounded text-xs"
                             >
                               {feature}
                             </span>
@@ -324,13 +324,13 @@ export function ImagePreviewModal({
 
               {/* Keyboard Shortcuts */}
               <div className="hidden lg:block text-xs text-gray-400">
-                <div className="mb-1">
+                <div className="mb-2">
                   <kbd className="px-2 py-1 bg-white bg-opacity/10 rounded">
                     ESC
                   </kbd>{" "}
                   Close
                 </div>
-                <div className="mb-1">
+                <div className="mb-2">
                   <kbd className="px-2 py-1 bg-white bg-opacity/10 rounded">
                     ←
                   </kbd>
