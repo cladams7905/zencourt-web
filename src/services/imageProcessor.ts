@@ -514,7 +514,9 @@ async function getImageMetadata(
  * @returns Promise that resolves to ProcessedImage
  */
 async function createImageData(file: File): Promise<ProcessedImage> {
-  const id = `${file.name}-${file.size}-${file.lastModified}`;
+  // Generate a unique ID using crypto.randomUUID() to avoid collisions
+  // when the same file is uploaded to different projects
+  const id = `${crypto.randomUUID()}-${file.name}-${file.size}-${file.lastModified}`;
   const previewUrl = await generatePreviewUrl(file);
   const metadata = await getImageMetadata(file, previewUrl);
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { StackProvider, StackTheme } from "@stackframe/stack";
 import { stackClientApp } from "../lib/stack/client";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,9 +27,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <StackProvider app={stackClientApp}>
-          <StackTheme theme={customTheme}>{children}</StackTheme>
-        </StackProvider>
+        <QueryProvider>
+          <StackProvider app={stackClientApp}>
+            <StackTheme theme={customTheme}>{children}</StackTheme>
+          </StackProvider>
+        </QueryProvider>
       </body>
     </html>
   );

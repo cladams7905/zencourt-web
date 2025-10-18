@@ -15,6 +15,7 @@ import { DragDropZone } from "./DragDropZone";
 import { ImageUploadGrid } from "./shared/ImageUploadGrid";
 import { ImagePreviewModal } from "./modals/ImagePreviewModal";
 import { CategorizedImageGrid } from "./image-grid/CategorizedImageGrid";
+import { TemplateMarketplaceModal } from "./modals/TemplateMarketplaceModal";
 import {
   createProject,
   updateProject,
@@ -63,6 +64,9 @@ export function UploadProjectModal({
   const [previewImageFromGrid, setPreviewImageFromGrid] =
     useState<ProcessedImage | null>(null);
   const [previewIndexFromGrid, setPreviewIndexFromGrid] = useState<number>(0);
+  const [showTemplateMarketplace, setShowTemplateMarketplace] = useState(false);
+  const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
   // Sync external isOpen prop with internal state
   useEffect(() => {
@@ -479,16 +483,29 @@ export function UploadProjectModal({
         status: "draft"
       });
 
+      // Extract available categories from images
+      const categories = images
+        .filter((img) => img.classification?.category)
+        .map((img) => img.classification!.category)
+        .filter((category, index, self) => self.indexOf(category) === index); // unique categories
+
       // Show success toast
       toast.success("Draft project saved!", {
-        description: `${draftTitle} has been saved. You can rename and edit it anytime from your dashboard.`
+        description: `${draftTitle} has been saved.`
       });
 
-      // Close modal and notify parent
+      // Set state for template marketplace
+      setSavedProjectId(updatedProject.id);
+      setAvailableCategories(categories);
+      setShowTemplateMarketplace(true);
+
+      // Close the upload modal
+      setInternalIsOpen(false);
+
+      // Notify parent that project was created
       if (onProjectCreated) {
         onProjectCreated(updatedProject);
       }
-      onClose();
     } catch (error) {
       console.error("Error saving draft:", error);
       toast.error("Failed to save draft", {
@@ -496,6 +513,20 @@ export function UploadProjectModal({
           error instanceof Error ? error.message : "Please try again."
       });
     }
+  };
+
+  // Template Marketplace Handlers
+  const handleTemplateMarketplaceClose = () => {
+    setShowTemplateMarketplace(false);
+    // Close the entire flow
+    onClose();
+  };
+
+  const handleTemplateSelected = (generatedContentId: string) => {
+    console.log("Template selected, content generating:", generatedContentId);
+    setShowTemplateMarketplace(false);
+    // Close the entire flow
+    onClose();
   };
 
   // Check if we can continue (at least one uploaded image)
@@ -514,6 +545,7 @@ export function UploadProjectModal({
     );
 
   return (
+    <>
     <Dialog open={internalIsOpen} onOpenChange={onClose}>
       <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto pb-0`}>
         <DialogHeader>
@@ -800,5 +832,17 @@ export function UploadProjectModal({
         />
       )}
     </Dialog>
+
+    {/* Template Marketplace Modal - Rendered outside parent Dialog */}
+    {showTemplateMarketplace && savedProjectId && (
+      <TemplateMarketplaceModal
+        isOpen={showTemplateMarketplace}
+        onClose={handleTemplateMarketplaceClose}
+        projectId={savedProjectId}
+        availableCategories={availableCategories}
+        onTemplateSelected={handleTemplateSelected}
+      />
+    )}
+    </>
   );
 }
