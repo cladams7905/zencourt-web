@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed:templates": "npx tsx src/db/seed/seed-templates.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -43,6 +44,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@stackframe/stack": "^2.8.43",
     "@supabase/postgrest-js": "^2.75.0",
+    "@tanstack/react-query": "^5.90.5",
     "@vercel/blob": "^2.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
