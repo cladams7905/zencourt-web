@@ -37,7 +37,7 @@ export function WorkflowTimeline({
   };
 
   return (
-    <div className="w-full px-6 py-4 border-b bg-white">
+    <div className="w-full px-6 py-4 bg-white">
       <nav aria-label="Project workflow progress" className="overflow-x-auto">
         <ol className="flex items-center justify-between min-w-max sm:min-w-0">
           {STAGES.map((stage, index) => {
@@ -48,10 +48,28 @@ export function WorkflowTimeline({
             return (
               <li
                 key={stage.id}
-                className={cn("flex items-center", !isLast && "flex-1")}
+                className={cn(
+                  "flex items-center relative",
+                  !isLast && "flex-1"
+                )}
               >
+                {/* Connecting line - behind circles, full width */}
+                {!isLast && (
+                  <div
+                    className={cn(
+                      "absolute left-5 w-full right-0 h-0.5 transition-colors duration-300 z-0",
+                      status === "completed" && "bg-primary",
+                      status === "active" &&
+                        "bg-gradient-to-r from-primary to-muted",
+                      status === "upcoming" && "bg-muted border-t border-dashed"
+                    )}
+                    style={{ top: "20px" }}
+                    aria-hidden="true"
+                  />
+                )}
+
                 {/* Stage indicator */}
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center relative z-10">
                   <button
                     onClick={() => isClickable && onStageClick(stage.id)}
                     disabled={!isClickable}
@@ -60,9 +78,9 @@ export function WorkflowTimeline({
                       status === "completed" &&
                         "bg-primary text-primary-foreground",
                       status === "active" &&
-                        "bg-primary text-primary-foreground ring-4 ring-primary/20 animate-pulse",
+                        "bg-primary text-primary-foreground",
                       status === "upcoming" &&
-                        "bg-muted text-muted-foreground border-2 border-border",
+                        "bg-muted text-muted-foreground border-1 border-border border-dashed",
                       isClickable && "cursor-pointer hover:scale-110",
                       !isClickable && "cursor-default"
                     )}
@@ -87,7 +105,7 @@ export function WorkflowTimeline({
                       <div className="w-3 h-3 bg-primary-foreground rounded-full" />
                     )}
                     {status === "upcoming" && (
-                      <div className="w-3 h-3 bg-muted-foreground/30 rounded-full" />
+                      <div className="w-3 h-3 bg-muted-foreground/10 rounded-full" />
                     )}
                   </button>
 
@@ -104,19 +122,6 @@ export function WorkflowTimeline({
                     <span className="sm:hidden">{stage.shortLabel}</span>
                   </span>
                 </div>
-
-                {/* Connecting line */}
-                {!isLast && (
-                  <div
-                    className={cn(
-                      "flex-1 h-0.5 mx-2 sm:mx-4 transition-colors duration-300",
-                      status === "completed" && "bg-primary",
-                      status === "active" && "bg-gradient-to-r from-primary to-muted",
-                      status === "upcoming" && "bg-muted border-t border-dashed"
-                    )}
-                    aria-hidden="true"
-                  />
-                )}
               </li>
             );
           })}
