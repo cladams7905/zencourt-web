@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
 import { ProjectNameInput } from "@/components/workflow/ProjectNameInput";
 import { WorkflowTimeline } from "@/components/workflow/WorkflowTimeline";
@@ -47,13 +48,17 @@ import type {
 import type { CategorizedGroup } from "@/types/roomCategory";
 import type {
   WorkflowStage,
+  WorkflowState,
   MediaSelection,
   GenerationProgress,
   GenerationStep
 } from "@/types/workflow";
 import { getCompletedStages } from "@/types/workflow";
 import { Progress } from "@/components/ui/progress";
-import { startGeneration, createProgressPoller } from "@/services/generationService";
+import {
+  startGeneration,
+  createProgressPoller
+} from "@/services/generationService";
 import { canProceedToStage } from "@/services/workflowValidation";
 import { useRef, useCallback } from "react";
 
@@ -78,7 +83,9 @@ export function ProjectWorkflowModal({
   // Project and image state
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [images, setImages] = useState<ProcessedImage[]>([]);
-  const [categorizedGroups, setCategorizedGroups] = useState<CategorizedGroup[]>([]);
+  const [categorizedGroups, setCategorizedGroups] = useState<
+    CategorizedGroup[]
+  >([]);
 
   // Media selection state
   const [selectedMedia, setSelectedMedia] = useState<MediaSelection[]>([]);
@@ -90,15 +97,18 @@ export function ProjectWorkflowModal({
 
   // Categorize stage state
   const [isCategorizing, setIsCategorizing] = useState(false);
-  const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null);
-  const [previewImageFromGrid, setPreviewImageFromGrid] = useState<ProcessedImage | null>(null);
+  const [processingProgress, setProcessingProgress] =
+    useState<ProcessingProgress | null>(null);
+  const [previewImageFromGrid, setPreviewImageFromGrid] =
+    useState<ProcessedImage | null>(null);
   const [previewIndexFromGrid, setPreviewIndexFromGrid] = useState<number>(0);
 
   // Review stage state
   const [isConfirming, setIsConfirming] = useState(false);
 
   // Generate stage state
-  const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
+  const [generationProgress, setGenerationProgress] =
+    useState<GenerationProgress | null>(null);
   const [generationJobIds, setGenerationJobIds] = useState<string[]>([]);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
 
@@ -148,7 +158,8 @@ export function ProjectWorkflowModal({
   const completedStages = getCompletedStages(currentStage);
 
   // Check if there's work in progress
-  const hasWorkInProgress = images.length > 0 || selectedMedia.length > 0 || currentStage !== "upload";
+  const hasWorkInProgress =
+    images.length > 0 || selectedMedia.length > 0 || currentStage !== "upload";
 
   // Handle modal close with confirmation
   const handleClose = () => {
@@ -209,7 +220,11 @@ export function ProjectWorkflowModal({
       generationProgress
     };
 
-    const validation = canProceedToStage(currentStage, targetStage, workflowState);
+    const validation = canProceedToStage(
+      currentStage,
+      targetStage,
+      workflowState
+    );
 
     if (!validation.valid) {
       // Show first error as toast
@@ -262,7 +277,9 @@ export function ProjectWorkflowModal({
 
     setIsLoadingPreviews(true);
     try {
-      const imageDataArray = await imageProcessorService.createImageDataArray(files);
+      const imageDataArray = await imageProcessorService.createImageDataArray(
+        files
+      );
 
       setImages((prev) => {
         const existingFilenames = new Set(prev.map((img) => img.file.name));
@@ -533,8 +550,7 @@ export function ProjectWorkflowModal({
       const organized = categorizeAndOrganizeImages(finalImages);
       setCategorizedGroups(organized.groups);
 
-      // Move to plan stage instead of staying on categorize
-      setCurrentStage("plan");
+      // Stay on categorize stage to show the grid
     } catch (error) {
       console.error("Error processing images:", error);
       toast.error("Failed to process images", {
@@ -548,6 +564,10 @@ export function ProjectWorkflowModal({
       setIsCategorizing(false);
       setProcessingProgress(null);
     }
+  };
+
+  const handleContinueFromCategorize = () => {
+    setCurrentStage("plan");
   };
 
   const handleBackToCategorize = () => {
@@ -679,8 +699,8 @@ export function ProjectWorkflowModal({
       return "max-w-3xl h-[90vh]";
     }
     return cn(
-      "max-w-7xl h-[95vh]",
-      "sm:max-w-7xl sm:h-[95vh]",
+      "max-w-2xl h-[90vh]",
+      "sm:max-w-2xl sm:h-[90vh]",
       "max-sm:w-screen max-sm:h-screen max-sm:rounded-none"
     );
   };
@@ -692,13 +712,14 @@ export function ProjectWorkflowModal({
     .filter((category, index, self) => self.indexOf(category) === index);
 
   // Check if we can continue from upload
+  const isUploadInitiated = images.length > 0;
   const canContinueFromUpload =
-    images.length > 0 &&
+    isUploadInitiated &&
     images.some(
       (img) => img.status === "uploaded" || img.status === "analyzed"
     );
   const allUploadedOrError =
-    images.length > 0 &&
+    isUploadInitiated &&
     images.every(
       (img) =>
         img.status === "uploaded" ||
@@ -709,9 +730,14 @@ export function ProjectWorkflowModal({
   return (
     <>
       <Dialog open={internalIsOpen} onOpenChange={handleClose}>
-        <DialogContent className={cn(getModalClassName(), "flex flex-col p-0 gap-0 overflow-hidden")}>
+        <DialogContent
+          className={cn(
+            getModalClassName(),
+            "flex flex-col p-0 gap-0 overflow-hidden"
+          )}
+        >
           {/* Modal Header - Fixed */}
-          <DialogHeader className="flex-shrink-0 border-b">
+          <DialogHeader className="max-w-2xl border-b">
             <ProjectNameInput
               value={projectName}
               onChange={setProjectName}
@@ -722,102 +748,260 @@ export function ProjectWorkflowModal({
               currentStage={currentStage}
               completedStages={completedStages}
             />
+            <DialogTitle className="hidden">Project Workflow</DialogTitle>
           </DialogHeader>
 
           {/* Stage Content - Scrollable */}
-          <div className="flex-1 overflow-hidden">
+          <div className="relative flex-1 overflow-auto">
             <div className="h-full">
               {/* Upload Stage */}
               {currentStage === "upload" && (
-                <div className="h-full flex flex-col overflow-auto">
-                  <div className="p-6 space-y-4">
-                    <DragDropZone
-                      onFilesSelected={handleFilesSelected}
-                      maxFiles={50}
-                      maxFileSize={10 * 1024 * 1024} // 10MB
-                      acceptedFormats={[".jpg", ".jpeg", ".png", ".webp"]}
-                      isDisabled={isLoadingPreviews}
-                    />
-
-                    <ImageUploadGrid
-                      images={images}
-                      onRemove={handleRemoveImage}
-                      onRetry={handleRetryUpload}
-                      onImageClick={handleImageClick}
-                    />
+                <>
+                  {" "}
+                  {/* Header */}
+                  <div className="sticky top-0 bg-white z-30 px-6 py-4 border-b">
+                    <h2 className="text-xl font-semibold">
+                      Choose Images to Upload
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Click to upload or drag and drop images of your property
+                      listing to generate content from.
+                    </p>
+                    {selectedMedia.length > 0 && (
+                      <p className="text-sm text-primary font-medium mt-2">
+                        {selectedMedia.length}{" "}
+                        {selectedMedia.length === 1 ? "item" : "items"} selected
+                      </p>
+                    )}
                   </div>
+                  <div className="flex flex-col">
+                    <div className={`p-6 space-y-4`}>
+                      <DragDropZone
+                        onFilesSelected={handleFilesSelected}
+                        maxFiles={50}
+                        maxFileSize={10 * 1024 * 1024} // 10MB
+                        acceptedFormats={[".jpg", ".jpeg", ".png", ".webp"]}
+                        isDisabled={isLoadingPreviews}
+                        isUploadInitiated={isUploadInitiated}
+                      />
 
-                  {/* Continue Button - Sticky at bottom */}
-                  {canContinueFromUpload && (
-                    <>
-                      <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-12 bg-gradient-to-t from-white via-white to-transparent" />
-                      <div className="sticky bottom-0 left-0 right-0 z-20 pt-0 pb-4 px-6 bg-white border-t">
-                        <Button
-                          onClick={handleContinueFromUpload}
-                          disabled={!allUploadedOrError || isCategorizing}
-                          className="w-full"
-                          size="lg"
-                        >
-                          {isCategorizing
-                            ? "Processing..."
-                            : !allUploadedOrError
-                            ? "Waiting for uploads to complete..."
-                            : `Continue with ${
-                                images.filter(
-                                  (img) =>
-                                    img.status === "uploaded" ||
-                                    img.status === "analyzed"
-                                ).length
-                              } image(s)`}
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
+                      <ImageUploadGrid
+                        images={images}
+                        onRemove={handleRemoveImage}
+                        onRetry={handleRetryUpload}
+                        onImageClick={handleImageClick}
+                      />
+                    </div>
+
+                    {/* Continue Button - Sticky at bottom */}
+                    {canContinueFromUpload && (
+                      <>
+                        <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t">
+                          <Button
+                            onClick={handleContinueFromUpload}
+                            disabled={!allUploadedOrError || isCategorizing}
+                            className="w-full"
+                            size="lg"
+                          >
+                            {isCategorizing
+                              ? "Processing..."
+                              : !allUploadedOrError
+                              ? "Waiting for uploads to complete..."
+                              : `Continue with ${
+                                  images.filter(
+                                    (img) =>
+                                      img.status === "uploaded" ||
+                                      img.status === "analyzed"
+                                  ).length
+                                } image(s)`}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
               )}
 
               {/* Categorize Stage */}
               {currentStage === "categorize" && (
-                <div className="h-full flex flex-col items-center justify-center p-6">
-                  <div className="w-full max-w-md space-y-4">
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold mb-2">
-                        {processingProgress?.phase === "uploading" &&
-                          "Uploading images..."}
-                        {processingProgress?.phase === "analyzing" &&
-                          "Analyzing with AI..."}
-                        {processingProgress?.phase === "categorizing" &&
-                          "Organizing categories..."}
-                        {processingProgress?.phase === "complete" &&
-                          "Processing complete!"}
-                        {!processingProgress && "Starting..."}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {processingProgress
-                          ? `${processingProgress.completed} of ${processingProgress.total} images`
-                          : "Please wait..."}
-                      </p>
-                    </div>
+                <>
+                  {isCategorizing ? (
+                    <div className="h-full flex flex-col items-center justify-center p-6">
+                      <div className="w-full max-w-md space-y-4">
+                        <div className="text-center">
+                          <h3 className="text-lg font-semibold mb-2">
+                            {processingProgress?.phase === "uploading" &&
+                              "Uploading images..."}
+                            {processingProgress?.phase === "analyzing" &&
+                              "Analyzing with AI..."}
+                            {processingProgress?.phase === "categorizing" &&
+                              "Organizing categories..."}
+                            {processingProgress?.phase === "complete" &&
+                              "Processing complete!"}
+                            {!processingProgress && "Starting..."}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {processingProgress
+                              ? `${processingProgress.completed} of ${processingProgress.total} images`
+                              : "Please wait..."}
+                          </p>
+                        </div>
 
-                    <div className="space-y-2">
-                      <Progress
-                        value={processingProgress?.overallProgress || 0}
-                        className="h-3"
-                      />
-                      <p className="text-xs text-center text-muted-foreground">
-                        {processingProgress?.overallProgress
-                          ? `${Math.round(processingProgress.overallProgress)}%`
-                          : "0%"}
-                      </p>
-                    </div>
+                        <div className="space-y-2">
+                          <Progress
+                            value={processingProgress?.overallProgress || 0}
+                            className="h-3"
+                          />
+                          <p className="text-xs text-center text-muted-foreground">
+                            {processingProgress?.overallProgress
+                              ? `${Math.round(
+                                  processingProgress.overallProgress
+                                )}%`
+                              : "0%"}
+                          </p>
+                        </div>
 
-                    {processingProgress?.currentImage && (
-                      <div className="text-xs text-center text-muted-foreground">
-                        Processing: {processingProgress.currentImage.file.name}
+                        {processingProgress?.currentImage && (
+                          <div className="text-xs text-center text-muted-foreground">
+                            Processing:{" "}
+                            {processingProgress.currentImage.file.name}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col overflow-auto">
+                      <div className="p-6 space-y-4 flex-1">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="text-lg font-semibold">
+                              Review Categorized Images
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {categorizedGroups.length} categories found with{" "}
+                              {
+                                images.filter((img) => img.classification)
+                                  .length
+                              }{" "}
+                              images
+                            </p>
+                          </div>
+                        </div>
+
+                        <CategorizedImageGrid
+                          groups={categorizedGroups}
+                          enablePreview={false}
+                          enableDragDrop={true}
+                          showConfidence={true}
+                          showPreviewMetadata={true}
+                          onImageClick={(image, categoryIndex, imageIndex) => {
+                            // Find the global index of the image in all images
+                            let globalIndex = 0;
+                            for (let i = 0; i < categoryIndex; i++) {
+                              globalIndex += categorizedGroups[i].images.length;
+                            }
+                            globalIndex += imageIndex;
+
+                            setPreviewImageFromGrid(image);
+                            setPreviewIndexFromGrid(globalIndex);
+                            setInternalIsOpen(false);
+                          }}
+                          onRecategorize={(
+                            imageId,
+                            fromCategoryIndex,
+                            toCategoryIndex
+                          ) => {
+                            // Find the image in the source category
+                            const fromGroup =
+                              categorizedGroups[fromCategoryIndex];
+                            const toGroup = categorizedGroups[toCategoryIndex];
+
+                            if (!fromGroup || !toGroup) return;
+
+                            const imageIndex = fromGroup.images.findIndex(
+                              (img) => img.id === imageId
+                            );
+                            if (imageIndex === -1) return;
+
+                            const movedImage = fromGroup.images[imageIndex];
+
+                            // Update the image's classification to match new category
+                            const updatedImage: ProcessedImage = {
+                              ...movedImage,
+                              classification: {
+                                ...movedImage.classification!,
+                                category: toGroup.category
+                              }
+                            };
+
+                            // Create new groups array with updated images
+                            const newGroups = [...categorizedGroups];
+
+                            // Remove from source category
+                            newGroups[fromCategoryIndex] = {
+                              ...fromGroup,
+                              images: fromGroup.images.filter(
+                                (img) => img.id !== imageId
+                              )
+                            };
+
+                            // Add to destination category
+                            newGroups[toCategoryIndex] = {
+                              ...toGroup,
+                              images: [...toGroup.images, updatedImage],
+                              avgConfidence:
+                                [...toGroup.images, updatedImage].reduce(
+                                  (sum, img) =>
+                                    sum + (img.classification?.confidence || 0),
+                                  0
+                                ) /
+                                (toGroup.images.length + 1)
+                            };
+
+                            // Filter out empty groups
+                            const filteredGroups = newGroups.filter(
+                              (group) => group.images.length > 0
+                            );
+
+                            // Update categorized groups
+                            setCategorizedGroups(filteredGroups);
+
+                            // Also update the images array to reflect the classification change
+                            setImages((prev) =>
+                              prev.map((img) =>
+                                img.id === imageId ? updatedImage : img
+                              )
+                            );
+
+                            toast.success("Image recategorized", {
+                              description: `Moved to ${toGroup.displayLabel}`
+                            });
+                          }}
+                        />
+                      </div>
+
+                      {/* Fade overlay and sticky footer */}
+                      <>
+                        <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-12 bg-gradient-to-t from-white via-white to-transparent" />
+                        <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t flex gap-3">
+                          <Button
+                            onClick={() => setCurrentStage("upload")}
+                            variant="outline"
+                            className="flex-1"
+                          >
+                            Back to Upload
+                          </Button>
+                          <Button
+                            onClick={handleContinueFromCategorize}
+                            className="flex-1"
+                          >
+                            Continue to Planning
+                          </Button>
+                        </div>
+                      </>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Plan Stage */}
@@ -916,11 +1100,15 @@ export function ProjectWorkflowModal({
                 ? {
                     displayLabel:
                       categorizedGroups.find((g) =>
-                        g.images.some((img) => img.id === previewImageFromGrid.id)
+                        g.images.some(
+                          (img) => img.id === previewImageFromGrid.id
+                        )
                       )?.displayLabel || "Unknown",
                     color:
                       categorizedGroups.find((g) =>
-                        g.images.some((img) => img.id === previewImageFromGrid.id)
+                        g.images.some(
+                          (img) => img.id === previewImageFromGrid.id
+                        )
                       )?.metadata.color || "#6b7280"
                   }
                 : undefined
@@ -937,7 +1125,8 @@ export function ProjectWorkflowModal({
             <AlertDialogTitle>Close Project Workflow?</AlertDialogTitle>
             <AlertDialogDescription>
               You have unsaved work in progress. Are you sure you want to close?
-              Your progress will be saved, but you'll need to start the workflow again.
+              Your progress will be saved, but you'll need to start the workflow
+              again.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

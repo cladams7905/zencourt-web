@@ -5,6 +5,7 @@ import { Upload, Image as ImageIcon } from "lucide-react";
 
 interface DragDropZoneProps {
   onFilesSelected: (files: File[]) => void;
+  isUploadInitiated: boolean;
   maxFiles?: number;
   maxFileSize?: number; // in bytes
   acceptedFormats?: string[];
@@ -13,6 +14,7 @@ interface DragDropZoneProps {
 
 export function DragDropZone({
   onFilesSelected,
+  isUploadInitiated,
   maxFiles = 50,
   maxFileSize = 10 * 1024 * 1024, // 10MB in bytes
   acceptedFormats = [".jpg", ".jpeg", ".png", ".webp"],
@@ -139,7 +141,7 @@ export function DragDropZone({
   };
 
   return (
-    <div className="w-full pb-6">
+    <div className={`w-full ${isUploadInitiated ? `h-[200px]` : `h-[385px]`}`}>
       <input
         ref={fileInputRef}
         type="file"
@@ -159,7 +161,7 @@ export function DragDropZone({
         onDrop={handleDrop}
         disabled={isDisabled}
         className={`
-          w-full min-h-[300px] rounded-lg border-2 border-dashed
+          w-full h-full rounded-lg border-2 border-dashed
           flex flex-col items-center justify-center gap-4 p-8
           transition-all duration-200
           ${
@@ -172,8 +174,7 @@ export function DragDropZone({
         `}
       >
         <div
-          className={`
-            w-16 h-16 rounded-full flex items-center justify-center
+          className={`w-16 h-16 aspect-square rounded-full flex items-center justify-center
             transition-colors duration-200
             ${
               isDragging
@@ -191,7 +192,9 @@ export function DragDropZone({
 
         <div className="text-center">
           <p className="text-base font-medium mb-2">
-            {isDragging ? "Drop your images here" : "Click to upload"}
+            {isDragging
+              ? "Drop your images here"
+              : "Click to upload or drag and drop"}
           </p>
           <p className="text-sm text-muted-foreground">
             {acceptedFormats
@@ -203,14 +206,6 @@ export function DragDropZone({
             Maximum {maxFiles} images
           </p>
         </div>
-
-        {!isDragging && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="w-12 h-px bg-border" />
-            <span>or drag and drop</span>
-            <div className="w-12 h-px bg-border" />
-          </div>
-        )}
       </button>
 
       {error && (
