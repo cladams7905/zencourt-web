@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useUser } from "@stackframe/stack";
 import { toast } from "sonner";
-import { DragDropZone } from "@/components/DragDropZone";
+import { DragDropZone } from "@/components/workflow/DragDropZone";
 import { ImageUploadGrid } from "@/components/shared/ImageUploadGrid";
 import { Button } from "@/components/ui/button";
 import { imageProcessorService } from "@/services/imageProcessor";
@@ -17,7 +17,6 @@ interface UploadStageProps {
   setImages: React.Dispatch<React.SetStateAction<ProcessedImage[]>>;
   currentProject: Project | null;
   setCurrentProject: React.Dispatch<React.SetStateAction<Project | null>>;
-  isCategorizing: boolean;
   selectedMediaCount?: number;
   onImageClick: (imageId: string) => void;
   onContinue: () => void;
@@ -28,7 +27,6 @@ export function UploadStage({
   setImages,
   currentProject,
   setCurrentProject,
-  isCategorizing,
   selectedMediaCount = 0,
   onImageClick,
   onContinue
@@ -41,7 +39,9 @@ export function UploadStage({
   const isUploadInitiated = images.length > 0;
   const canContinueFromUpload =
     isUploadInitiated &&
-    images.some((img) => img.status === "uploaded" || img.status === "analyzed");
+    images.some(
+      (img) => img.status === "uploaded" || img.status === "analyzed"
+    );
   const allUploadedOrError =
     isUploadInitiated &&
     images.every(
@@ -315,13 +315,11 @@ export function UploadStage({
           <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t">
             <Button
               onClick={onContinue}
-              disabled={!allUploadedOrError || isCategorizing}
+              disabled={!allUploadedOrError}
               className="w-full"
               size="lg"
             >
-              {isCategorizing
-                ? "Processing..."
-                : !allUploadedOrError
+              {!allUploadedOrError
                 ? "Waiting for uploads to complete..."
                 : `Continue with ${
                     images.filter(
