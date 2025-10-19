@@ -71,7 +71,7 @@ export function ProjectNameInput({
   const isEmpty = !localValue;
 
   return (
-    <div className="flex items-center gap-2 px-6 pt-4 pb-2">
+    <div className="flex items-center gap-2 px-6 pt-6 pb-2 pr-8">
       <div className="flex-1 relative group">
         {isEditing ? (
           <input
@@ -82,7 +82,7 @@ export function ProjectNameInput({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             className={cn(
-              "w-full text-2xl font-bold bg-transparent border-b-2 border-primary outline-none transition-colors",
+              "w-full text-2xl font-spartan font-semibold bg-transparent border-b-2 border-primary outline-none transition-colors",
               "placeholder:text-muted-foreground/50"
             )}
             placeholder={placeholder}
@@ -93,7 +93,7 @@ export function ProjectNameInput({
           <button
             onClick={handleClick}
             className={cn(
-              "w-full text-left text-2xl font-bold transition-colors",
+              "w-full text-left font-spartan text-2xl font-semibold transition-colors",
               "hover:text-primary focus:outline-none focus:text-primary",
               isEmpty && "text-muted-foreground/50"
             )}
@@ -107,7 +107,7 @@ export function ProjectNameInput({
         {!isEditing && (
           <Pencil
             className={cn(
-              "absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground",
+              "absolute left-44 -mt-[2px] top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground",
               "opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
             )}
           />
