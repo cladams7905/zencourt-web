@@ -207,3 +207,7 @@ html {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+.font-spartan {
+  font-family: "League Spartan", sans-serif;
+}
