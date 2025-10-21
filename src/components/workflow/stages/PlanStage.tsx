@@ -41,10 +41,21 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
+export interface VideoSettings {
+  orientation: "landscape" | "vertical";
+  roomOrder: Array<{ id: string; name: string; imageCount: number }>;
+  logoFile: File | null;
+  logoPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  scriptText: string;
+  enableSubtitles: boolean;
+  subtitleFont: string;
+  aiDirections: string;
+}
+
 interface PlanStageProps {
   availableCategories: string[];
   categorizedGroups?: CategorizedGroup[];
-  onContinue: () => void;
+  onContinue: (settings: VideoSettings) => void;
   onBack: () => void;
 }
 
@@ -597,7 +608,23 @@ export function PlanStage({
           <Button onClick={onBack} variant="outline" className="flex-1" size="lg">
             Back to Categorize
           </Button>
-          <Button onClick={onContinue} className="flex-1" size="lg">
+          <Button
+            onClick={() => {
+              const settings: VideoSettings = {
+                orientation,
+                roomOrder,
+                logoFile,
+                logoPosition,
+                scriptText,
+                enableSubtitles,
+                subtitleFont,
+                aiDirections,
+              };
+              onContinue(settings);
+            }}
+            className="flex-1"
+            size="lg"
+          >
             Continue to Review
           </Button>
         </div>
