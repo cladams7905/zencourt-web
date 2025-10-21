@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { images } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Image, NewImage } from "@/types/schema";
 import { getUser } from "./users";
 import { SerializableImageData } from "@/types/images";
@@ -43,8 +43,21 @@ export async function saveImages(
     }
   }));
 
-  // Insert images into database
-  const savedImages = await db.insert(images).values(imageRecords).returning();
+  // Upsert images into database (insert or update on conflict)
+  const savedImages = await db
+    .insert(images)
+    .values(imageRecords)
+    .onConflictDoUpdate({
+      target: images.id,
+      set: {
+        category: sql`excluded.category`,
+        confidence: sql`excluded.confidence`,
+        features: sql`excluded.features`,
+        order: sql`excluded.order`,
+        metadata: sql`excluded.metadata`
+      }
+    })
+    .returning();
 
   return savedImages as Image[];
 }

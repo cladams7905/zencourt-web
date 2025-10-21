@@ -184,16 +184,9 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
                     />
                   )}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                    {project.status === "draft" ? (
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-purple-600 text-white rounded-full px-4 py-2 flex items-center gap-2">
-                        <Sparkles size={20} />
-                        <span className="font-medium">Generate Content</span>
-                      </div>
-                    ) : (
-                      <button className="opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-3">
-                        <Play size={24} fill="black" stroke="black" />
-                      </button>
-                    )}
+                    <button className="opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-3">
+                      <Play size={24} fill="black" stroke="black" />
+                    </button>
                   </div>
                   <div className="absolute top-3 right-3 flex gap-2">
                     {project.subtitles && (

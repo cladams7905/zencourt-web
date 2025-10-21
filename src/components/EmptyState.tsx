@@ -30,28 +30,6 @@ export function EmptyState({ onCreateProject }: EmptyStateProps) {
         <Plus size={20} />
         Create New Project
       </button>
-
-      {/* Optional: Feature highlights */}
-      <div className="mt-12 grid grid-cols-1 sm:grid-cols-4 gap-6 max-w-3xl text-left">
-        <div className="flex flex-col gap-2">
-          <div className="text-sm font-medium">📸 Upload Photos</div>
-          <p className="text-xs text-muted-foreground">
-            Drag and drop up to 50 property images
-          </p>
-        </div>
-        <div className="flex flex-col gap-2">
-          <div className="text-sm font-medium">🤖 AI Sorting</div>
-          <p className="text-xs text-muted-foreground">
-            Automatic room detection and categorization
-          </p>
-        </div>
-        <div className="flex flex-col gap-2">
-          <div className="text-sm font-medium">🎬 Generate Video</div>
-          <p className="text-xs text-muted-foreground">
-            Professional videos optimized for social media
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
