@@ -34,7 +34,7 @@ export function ImageUploadGrid({
         </h3>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
         {images.map((image) => (
           <div
             key={image.id}

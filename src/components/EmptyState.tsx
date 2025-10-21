@@ -19,7 +19,8 @@ export function EmptyState({ onCreateProject }: EmptyStateProps) {
       </h2>
 
       <p className="text-muted-foreground text-sm sm:text-base max-w-md mb-8">
-        Create your first AI-generated property video. Upload your listing photos and let our AI transform them into engaging social media content.
+        Create your first AI-generated property video. Upload your listing
+        photos and let our AI transform them into engaging social media content.
       </p>
 
       <button
@@ -31,7 +32,7 @@ export function EmptyState({ onCreateProject }: EmptyStateProps) {
       </button>
 
       {/* Optional: Feature highlights */}
-      <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl text-left">
+      <div className="mt-12 grid grid-cols-1 sm:grid-cols-4 gap-6 max-w-3xl text-left">
         <div className="flex flex-col gap-2">
           <div className="text-sm font-medium">📸 Upload Photos</div>
           <p className="text-xs text-muted-foreground">

@@ -75,9 +75,20 @@ async function processImages(
   const startTime = Date.now();
 
   // Check if images are already uploaded
+  // Note: status can be "uploaded", "analyzed", or "analyzing" if already processed
   const alreadyUploaded = imageDataList.every(
-    (img) => img.status === "uploaded" && img.uploadUrl
+    (img) => img.uploadUrl && (img.status === "uploaded" || img.status === "analyzed" || img.status === "analyzing")
   );
+
+  console.log('Image processor check:', {
+    totalImages: imageDataList.length,
+    alreadyUploaded,
+    imageStatuses: imageDataList.map(img => ({
+      id: img.id.substring(0, 20),
+      status: img.status,
+      hasUploadUrl: !!img.uploadUrl
+    }))
+  });
 
   let uploadedImages: ProcessedImage[];
 
@@ -86,6 +97,7 @@ async function processImages(
     uploadedImages = imageDataList;
     console.log("Images already uploaded, skipping upload phase");
   } else {
+    console.log("Some images need uploading, starting upload phase");
     // Initialize processed images array for upload
     const processedImages: ProcessedImage[] = imageDataList.map((img) => ({
       id: img.id,
@@ -268,9 +280,9 @@ async function analyzeImages(
     result: ProcessedImage
   ) => void
 ): Promise<ProcessedImage[]> {
-  // Filter only successfully uploaded images
+  // Filter only successfully uploaded images (can be "uploaded", "analyzed", or "analyzing" if re-processing)
   const uploadedImages = images.filter(
-    (img) => img.status === "uploaded" && img.uploadUrl
+    (img) => img.uploadUrl && (img.status === "uploaded" || img.status === "analyzed" || img.status === "analyzing")
   );
 
   if (uploadedImages.length === 0) {

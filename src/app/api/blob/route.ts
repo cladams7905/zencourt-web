@@ -44,10 +44,11 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Upload to Vercel Blob Storage
+    // Upload to Vercel Blob Storage with random suffix to avoid duplicates
     const blob = await put(`${folder}/${file.name}`, file, {
       access: 'public',
       token,
+      addRandomSuffix: true,
     });
 
     return NextResponse.json({

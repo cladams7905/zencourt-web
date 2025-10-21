@@ -141,7 +141,7 @@ export function DragDropZone({
   };
 
   return (
-    <div className={`w-full ${isUploadInitiated ? `h-[200px]` : `h-[385px]`}`}>
+    <div className={`w-full ${isUploadInitiated ? `h-[200px]` : `h-[500px]`}`}>
       <input
         ref={fileInputRef}
         type="file"

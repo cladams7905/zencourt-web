@@ -1,7 +1,14 @@
-import { Play, MoreVertical, Plus, Video, LayoutGrid, Sparkles } from "lucide-react";
+import {
+  Play,
+  MoreVertical,
+  Plus,
+  Video,
+  LayoutGrid,
+  Sparkles
+} from "lucide-react";
 import { useState } from "react";
 import { EmptyState } from "./EmptyState";
-import { UploadProjectModal } from "./UploadProjectModal";
+import { ProjectWorkflowModal } from "./modals/ProjectWorkflowModal";
 import { GeneratedContentCard } from "./GeneratedContentCard";
 import { TemplateMarketplaceModal } from "./modals/TemplateMarketplaceModal";
 import { useProjectGeneratedContent } from "@/hooks/useTemplates";
@@ -16,32 +23,36 @@ interface ProjectsViewProps {
 
 // Separate component to handle generated content for a single project
 function ProjectGeneratedContent({ project }: { project: Project }) {
-  const { data: generatedContent, isLoading } = useProjectGeneratedContent(project.id);
+  const { data: generatedContent, isLoading } = useProjectGeneratedContent(
+    project.id
+  );
 
   // Return the data for parent to use
   return { generatedContent, isLoading };
 }
 
 export function ProjectsView({ initialProjects }: ProjectsViewProps) {
-  const [viewMode, setViewMode] = useState<"projects" | "generated">("projects");
+  const [viewMode, setViewMode] = useState<"projects" | "generated">(
+    "projects"
+  );
   const [filter, setFilter] = useState<"all" | "vertical" | "landscape">("all");
   const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
   const [selectedProjectForTemplates, setSelectedProjectForTemplates] =
     useState<Project | null>(null);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
   const handleCreateProject = () => {
-    setIsUploadModalOpen(true);
+    setIsWorkflowModalOpen(true);
   };
 
   const handleCloseModal = () => {
-    setIsUploadModalOpen(false);
+    setIsWorkflowModalOpen(false);
   };
 
   const handleProjectCreated = (project: Project) => {
     setProjects([...projects, project]);
-    setIsUploadModalOpen(false);
+    setIsWorkflowModalOpen(false);
   };
 
   const handleProjectClick = async (project: Project) => {
@@ -96,8 +107,8 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 min-h-screen flex items-center justify-center">
         <EmptyState onCreateProject={handleCreateProject} />
-        <UploadProjectModal
-          isOpen={isUploadModalOpen}
+        <ProjectWorkflowModal
+          isOpen={isWorkflowModalOpen}
           onClose={handleCloseModal}
           onProjectCreated={handleProjectCreated}
         />
@@ -181,7 +192,8 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
               }`}
             >
               <Video size={16} />
-              <span className="hidden xs:inline">Vertical</span> <span>(9:16)</span>
+              <span className="hidden xs:inline">Vertical</span>{" "}
+              <span>(9:16)</span>
             </button>
             <button
               onClick={() => setFilter("landscape")}
@@ -197,7 +209,7 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {filteredProjects.map((project) => (
               <div
                 key={project.id}
@@ -287,8 +299,8 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
         />
       )}
 
-      <UploadProjectModal
-        isOpen={isUploadModalOpen}
+      <ProjectWorkflowModal
+        isOpen={isWorkflowModalOpen}
         onClose={handleCloseModal}
         onProjectCreated={handleProjectCreated}
       />
@@ -319,7 +331,9 @@ function GeneratedContentView({
   // Fetch generated content for each project (hooks called at top level)
   const projectsWithContent = projects.map((project) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { data: generatedContent, isLoading } = useProjectGeneratedContent(project.id);
+    const { data: generatedContent, isLoading } = useProjectGeneratedContent(
+      project.id
+    );
     return { project, generatedContent, isLoading };
   });
 
@@ -370,7 +384,7 @@ function GeneratedContentView({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {generatedContent!.map((content) => (
               <GeneratedContentCard
                 key={content.id}
