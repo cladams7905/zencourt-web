@@ -9,7 +9,12 @@ import { CategorizedImageGrid } from "@/components/image-grid/CategorizedImageGr
 import { imageProcessorService } from "@/services/imageProcessor";
 import { categorizeAndOrganizeImages } from "@/services/categorization";
 import { updateProject } from "@/db/actions/projects";
-import type { ProcessedImage, ProcessingProgress } from "@/types/images";
+import { saveImages } from "@/db/actions/images";
+import type {
+  ProcessedImage,
+  ProcessingProgress,
+  SerializableImageData
+} from "@/types/images";
 import type { CategorizedGroup } from "@/types/roomCategory";
 import type { Project } from "@/types/schema";
 
@@ -44,6 +49,8 @@ export function CategorizeStage({
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [processingProgress, setProcessingProgress] =
     useState<ProcessingProgress | null>(null);
+  // Use state instead of ref so it persists across modal close/reopen
+  const [hasInitiatedProcessing, setHasInitiatedProcessing] = useState(false);
 
   // Check if we need to process images on mount
   const alreadyAnalyzed = images.filter(
@@ -58,29 +65,12 @@ export function CategorizeStage({
       !img.error
   );
 
-  console.log("CategorizeStage state:", {
-    totalImages: images.length,
-    alreadyAnalyzed: alreadyAnalyzed.length,
-    needsAnalysis: needsAnalysis.length,
-    categorizedGroupsLength: categorizedGroups.length,
-    isCategorizing,
-    imageDetails: images.map((img) => ({
-      name: img.file.name.substring(0, 30),
-      status: img.status,
-      hasClassification: !!img.classification,
-      hasUploadUrl: !!img.uploadUrl
-    }))
-  });
-
   // If images need analysis and we haven't started processing, start automatically
   // Check if the number of analyzed images doesn't match total images needing it
   const totalImagesThatShouldBeAnalyzed =
     alreadyAnalyzed.length + needsAnalysis.length;
   const allImagesAnalyzed =
     totalImagesThatShouldBeAnalyzed === alreadyAnalyzed.length;
-
-  const shouldProcess =
-    needsAnalysis.length > 0 && !isCategorizing && !allImagesAnalyzed;
 
   const handleProcessImages = useCallback(async () => {
     if (!user || !currentProject) {
@@ -90,6 +80,8 @@ export function CategorizeStage({
       return;
     }
 
+    // Mark that processing has been initiated
+    setHasInitiatedProcessing(true);
     setIsCategorizing(true);
 
     try {
@@ -98,18 +90,6 @@ export function CategorizeStage({
       let finalImages: ProcessedImage[];
 
       if (needsAnalysis.length > 0) {
-        // Log to debug upload issues
-        console.log(
-          "Images needing analysis:",
-          needsAnalysis.map((img) => ({
-            id: img.id,
-            name: img.file.name,
-            status: img.status,
-            hasUploadUrl: !!img.uploadUrl,
-            uploadUrl: img.uploadUrl
-          }))
-        );
-
         // Set initial progress state immediately - start with analyzing since images are already uploaded
         setProcessingProgress({
           phase: "analyzing",
@@ -174,6 +154,29 @@ export function CategorizeStage({
       const organized = categorizeAndOrganizeImages(finalImages);
       setCategorizedGroups(organized.groups);
 
+      // Save images to database
+      try {
+        const serializableImages: SerializableImageData[] = finalImages
+          .filter((img) => img.uploadUrl && img.classification)
+          .map((img) => ({
+            id: img.id,
+            filename: img.file.name,
+            uploadUrl: img.uploadUrl!,
+            classification: img.classification!,
+            metadata: img.metadata || undefined
+          }));
+
+        if (serializableImages.length > 0) {
+          await saveImages(currentProject.id, serializableImages);
+        }
+      } catch (error) {
+        console.error("Error saving images to database:", error);
+        toast.error("Error saving images to database", {
+          description: "Please try uploading images again."
+        });
+        // Don't fail the whole process if DB save fails, just log it
+      }
+
       // Show completion
       setProcessingProgress({
         phase: "complete",
@@ -202,15 +205,24 @@ export function CategorizeStage({
     needsAnalysis,
     setCategorizedGroups,
     setImages,
+    setHasInitiatedProcessing,
     user
   ]);
 
   // Auto-start processing when component mounts if needed
+  // Only run once using state to prevent multiple calls across remounts
   React.useEffect(() => {
-    if (shouldProcess) {
+    // Skip if already processing or if state indicates we've already started
+    if (isCategorizing || hasInitiatedProcessing) {
+      return;
+    }
+
+    // Check if we need to process
+    if (needsAnalysis.length > 0 && !allImagesAnalyzed) {
       handleProcessImages();
     }
-  }, [shouldProcess, handleProcessImages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run on mount
 
   const handleRecategorize = (
     imageId: string,
