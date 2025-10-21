@@ -337,7 +337,6 @@ export function CategorizeStage({
 
       {/* Fade overlay and sticky footer */}
       <>
-        <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-12 bg-gradient-to-t from-white via-white to-transparent" />
         <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t flex gap-3">
           <Button
             onClick={onBack}
