@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Video, Share2, Settings, Upload, LogOut, Menu, X } from "lucide-react";
+import { Home, LogOut, Menu, X } from "lucide-react";
 import { useUser } from "@stackframe/stack";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";

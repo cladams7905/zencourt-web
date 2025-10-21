@@ -68,7 +68,7 @@ export async function createGenerationJobs(
         .where(eq(projects.id, projectId))
         .limit(1);
 
-      const currentMetadata = (result[0]?.metadata as any) || {};
+      const currentMetadata = result[0]?.metadata || {};
 
       await db
         .update(projects)
@@ -115,7 +115,7 @@ export async function getGenerationJobStatus(
       return null;
     }
 
-    const metadata = result[0].metadata as any;
+    const metadata = result[0].metadata;
     const jobs: GenerationJob[] = metadata?.generationJobs || [];
 
     const job = jobs.find((j) => j.id === jobId);
@@ -145,7 +145,7 @@ export async function getGenerationJobs(
       return [];
     }
 
-    const metadata = result[0].metadata as any;
+    const metadata = result[0].metadata;
     return metadata?.generationJobs || [];
   } catch (error) {
     console.error("Error getting generation jobs:", error);
@@ -185,7 +185,7 @@ export async function updateGenerationJobProgress(
       throw new Error("Project not found");
     }
 
-    const metadata = result[0].metadata as any;
+    const metadata = result[0].metadata;
     const jobs: GenerationJob[] = metadata?.generationJobs || [];
 
     // Update the specific job
@@ -235,7 +235,7 @@ export async function deleteGenerationJobs(projectId: string): Promise<void> {
       return;
     }
 
-    const metadata = result[0].metadata as any;
+    const metadata = result[0].metadata;
 
     await db
       .update(projects)
@@ -259,9 +259,7 @@ export async function deleteGenerationJobs(projectId: string): Promise<void> {
  * Simulate generation progress (for development)
  * This would be replaced by actual generation service in production
  */
-export async function simulateGenerationProgress(
-  jobId: string
-): Promise<void> {
+export async function simulateGenerationProgress(jobId: string): Promise<void> {
   try {
     // Simulate processing
     await new Promise((resolve) => setTimeout(resolve, 1000));

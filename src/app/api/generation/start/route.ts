@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getUser } from "@stackframe/stack";
+import { stackServerApp } from "@/lib/stack/server";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -20,13 +20,20 @@ import {
 // Types
 // ============================================================================
 
+interface VideoSettings {
+  orientation: "landscape" | "vertical";
+  roomOrder: Array<{ id: string; name: string; imageCount: number }>;
+  logoFile?: File | null;
+  logoPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  scriptText: string;
+  enableSubtitles: boolean;
+  subtitleFont: string;
+  aiDirections: string;
+}
+
 interface StartGenerationRequest {
   projectId: string;
-  selections: {
-    templateId: string;
-    platform: string;
-    mediaType: string;
-  }[];
+  videoSettings: VideoSettings;
 }
 
 // ============================================================================
@@ -36,7 +43,7 @@ interface StartGenerationRequest {
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user
-    const user = await getUser();
+    const user = await stackServerApp.getUser();
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized", message: "Please sign in to continue" },
@@ -46,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: StartGenerationRequest = await request.json();
-    const { projectId, selections } = body;
+    const { projectId, videoSettings } = body;
 
     // Validate request
     if (!projectId) {
@@ -56,11 +63,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!selections || selections.length === 0) {
+    if (!videoSettings) {
       return NextResponse.json(
         {
           error: "Invalid request",
-          message: "At least one template selection is required"
+          message: "Video settings are required"
         },
         { status: 400 }
       );
@@ -88,37 +95,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Check subscription status for premium templates
-    // const subscription = await getSubscription(user.id);
-    // const premiumTemplates = selections.filter(s => s.template.isPremium);
-    // if (premiumTemplates.length > 0 && !subscription?.features.premiumTemplates) {
-    //   return NextResponse.json(
-    //     { error: "Subscription required", message: "Premium subscription required for selected templates" },
-    //     { status: 403 }
-    //   );
-    // }
-
-    // TODO: Check for missing required categories
-    // This would require fetching template data and comparing with project images
-    // const missingCategories = validateRequiredCategories(selections, project);
-    // if (missingCategories.length > 0) {
-    //   return NextResponse.json(
-    //     {
-    //       error: "Missing categories",
-    //       message: `Missing required categories: ${missingCategories.join(", ")}`
-    //     },
-    //     { status: 400 }
-    //   );
-    // }
-
-    // Create generation jobs
-    const jobParams: CreateGenerationJobParams[] = selections.map((s) => ({
+    // Create a single generation job for the video
+    const jobParams: CreateGenerationJobParams = {
       projectId,
-      templateId: s.templateId,
-      platform: s.platform
-    }));
+      templateId: "video-generation", // Static ID for video generation
+      platform: videoSettings.orientation === "landscape" ? "youtube" : "tiktok"
+    };
 
-    const jobs = await createGenerationJobs(jobParams);
+    const jobs = await createGenerationJobs([jobParams]);
+    const job = jobs[0];
 
     // Update project status to generating
     await db
@@ -129,23 +114,27 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(projects.id, projectId));
 
-    // Start background generation (simulation for now)
-    // In production, this would trigger a background worker or queue
-    for (const job of jobs) {
-      // Don't await - run in background
-      simulateGenerationProgress(job.id).catch((error) => {
-        console.error(`Background generation failed for job ${job.id}:`, error);
-      });
-    }
+    // TODO: Here you would call the Sora API with the video settings
+    // For now, we'll simulate the generation progress
+    // In production, this would:
+    // 1. Upload images to cloud storage
+    // 2. Call Sora API with video settings and image URLs
+    // 3. Poll for completion
+    // 4. Download and store the generated video
 
-    // Calculate estimated completion time (rough estimate)
-    const estimatedTime = selections.length * 60; // 60 seconds per item
+    // Start background generation (simulation for now)
+    simulateGenerationProgress(job.id).catch((error) => {
+      console.error(`Background generation failed for job ${job.id}:`, error);
+    });
+
+    // Calculate estimated completion time (2 minutes for video generation)
+    const estimatedTime = 120; // 2 minutes
 
     return NextResponse.json({
       success: true,
-      jobIds: jobs.map((j) => j.id),
+      jobIds: [job.id],
       estimatedCompletionTime: estimatedTime,
-      message: "Generation started successfully"
+      message: "Video generation started successfully"
     });
   } catch (error) {
     console.error("Error starting generation:", error);

@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getUser } from "@stackframe/stack";
+import { stackServerApp } from "@/lib/stack/server";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -18,11 +18,11 @@ import { getGenerationJobStatus } from "@/db/actions/generation";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
     // Authenticate user
-    const user = await getUser();
+    const user = await stackServerApp.getUser();
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized", message: "Please sign in to continue" },
@@ -30,7 +30,7 @@ export async function GET(
       );
     }
 
-    const { jobId } = params;
+    const { jobId } = await params;
 
     // Get job status
     const job = await getGenerationJobStatus(jobId);

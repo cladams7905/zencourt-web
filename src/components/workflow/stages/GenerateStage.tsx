@@ -14,19 +14,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import type { GenerationProgress, MediaSelection } from "@/types/workflow";
-import { Clock, Loader2 } from "lucide-react";
+import type { GenerationProgress } from "@/types/workflow";
+import { Clock } from "lucide-react";
 
 interface GenerateStageProps {
   progress: GenerationProgress;
-  selectedMedia: MediaSelection[];
   onCancel?: () => void;
   onRetry?: () => void;
 }
 
 export function GenerateStage({
   progress,
-  selectedMedia,
   onCancel,
   onRetry
 }: GenerateStageProps) {
@@ -65,9 +63,7 @@ export function GenerateStage({
             ? "Your content has been successfully generated"
             : hasFailed
             ? "Some steps encountered errors"
-            : `Creating ${selectedMedia.length} ${
-                selectedMedia.length === 1 ? "item" : "items"
-              } from your images`}
+            : "Creating video from your images"}
         </p>
       </div>
 
@@ -80,7 +76,9 @@ export function GenerateStage({
               <div className="flex items-center justify-center gap-2 text-primary">
                 <Clock className="w-5 h-5" />
                 <div className="text-center">
-                  <p className="text-sm font-medium">Estimated Time Remaining</p>
+                  <p className="text-sm font-medium">
+                    Estimated Time Remaining
+                  </p>
                   <p className="text-2xl font-bold">
                     {formatTimeRemaining(progress.estimatedTimeRemaining)}
                   </p>
@@ -134,9 +132,7 @@ export function GenerateStage({
                 All Content Generated!
               </h3>
               <p className="text-sm text-green-700">
-                Your {selectedMedia.length}{" "}
-                {selectedMedia.length === 1 ? "item has" : "items have"} been
-                successfully created and are ready to download.
+                Your video has been successfully created and is ready to download.
               </p>
             </div>
           )}
@@ -164,8 +160,8 @@ export function GenerateStage({
                   Generation Failed
                 </h3>
                 <p className="text-sm text-red-700 mb-4">
-                  Some items could not be generated. Please check the errors above
-                  and try again.
+                  Some items could not be generated. Please check the errors
+                  above and try again.
                 </p>
               </div>
               {onRetry && (
@@ -202,7 +198,7 @@ export function GenerateStage({
             <AlertDialogTitle>Cancel Generation?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to cancel the generation process? Any
-              progress will be lost and you'll need to start over.
+              progress will be lost and you&apos;ll need to start over.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

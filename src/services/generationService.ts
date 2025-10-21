@@ -5,12 +5,10 @@
  */
 
 import type {
-  MediaSelection,
   GenerationProgress,
   GenerationStep,
   GenerationStepStatus
 } from "@/types/workflow";
-import type { ContentType } from "@/types/templates";
 
 // ============================================================================
 // Types
@@ -29,9 +27,20 @@ interface GenerationJob {
   updatedAt: Date;
 }
 
+interface VideoSettings {
+  orientation: "landscape" | "vertical";
+  roomOrder: Array<{ id: string; name: string; imageCount: number }>;
+  logoFile?: File | null;
+  logoPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  scriptText: string;
+  enableSubtitles: boolean;
+  subtitleFont: string;
+  aiDirections: string;
+}
+
 interface StartGenerationParams {
   projectId: string;
-  selections: MediaSelection[];
+  videoSettings: VideoSettings;
 }
 
 interface StartGenerationResponse {
@@ -52,37 +61,11 @@ interface PollProgressResponse {
 }
 
 // ============================================================================
-// Generation Time Estimates
-// ============================================================================
-
-const GENERATION_TIME_ESTIMATES: Record<ContentType, number> = {
-  video: 120, // 2 minutes
-  post: 30, // 30 seconds
-  flyer: 45 // 45 seconds
-};
-
-/**
- * Calculate estimated generation time for a media selection
- */
-export function calculateTimeEstimate(contentType: ContentType): number {
-  return GENERATION_TIME_ESTIMATES[contentType] || 60;
-}
-
-/**
- * Calculate total estimated time for multiple selections
- */
-export function calculateTotalEstimate(selections: MediaSelection[]): number {
-  return selections.reduce((sum, selection) => {
-    return sum + calculateTimeEstimate(selection.template.contentType);
-  }, 0);
-}
-
-// ============================================================================
 // Generation Service
 // ============================================================================
 
 /**
- * Start generation process for selected media
+ * Start generation process for video with settings
  */
 export async function startGeneration(
   params: StartGenerationParams
@@ -95,11 +78,7 @@ export async function startGeneration(
       },
       body: JSON.stringify({
         projectId: params.projectId,
-        selections: params.selections.map((s) => ({
-          templateId: s.templateId,
-          platform: s.platform,
-          mediaType: s.mediaType
-        }))
+        videoSettings: params.videoSettings
       })
     });
 
@@ -113,7 +92,7 @@ export async function startGeneration(
     return {
       success: true,
       jobIds: data.jobIds,
-      estimatedCompletionTime: calculateTotalEstimate(params.selections)
+      estimatedCompletionTime: data.estimatedCompletionTime || 120 // 2 minutes default
     };
   } catch (error) {
     console.error("Error starting generation:", error);
@@ -172,9 +151,7 @@ export async function pollGenerationProgress(
     // Find current step
     const currentStepIndex = steps.findIndex((s) => s.status === "in-progress");
     const currentStep =
-      currentStepIndex >= 0
-        ? steps[currentStepIndex]
-        : steps[steps.length - 1];
+      currentStepIndex >= 0 ? steps[currentStepIndex] : steps[steps.length - 1];
 
     // Calculate time remaining (rough estimate)
     const remainingSteps = steps.filter(
@@ -189,7 +166,8 @@ export async function pollGenerationProgress(
       progress: {
         currentStep: currentStep.label,
         totalSteps: steps.length,
-        currentStepIndex: currentStepIndex >= 0 ? currentStepIndex : steps.length - 1,
+        currentStepIndex:
+          currentStepIndex >= 0 ? currentStepIndex : steps.length - 1,
         estimatedTimeRemaining,
         overallProgress,
         steps
@@ -226,7 +204,9 @@ export async function cancelGeneration(jobId: string): Promise<boolean> {
 /**
  * Get generation job status
  */
-export async function getGenerationStatus(jobId: string): Promise<GenerationJob | null> {
+export async function getGenerationStatus(
+  jobId: string
+): Promise<GenerationJob | null> {
   try {
     const response = await fetch(`/api/generation/status/${jobId}`);
 

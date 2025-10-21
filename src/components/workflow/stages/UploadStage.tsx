@@ -17,7 +17,6 @@ interface UploadStageProps {
   setImages: React.Dispatch<React.SetStateAction<ProcessedImage[]>>;
   currentProject: Project | null;
   setCurrentProject: React.Dispatch<React.SetStateAction<Project | null>>;
-  selectedMediaCount?: number;
   onImageClick: (imageId: string) => void;
   onContinue: () => void;
 }
@@ -27,7 +26,6 @@ export function UploadStage({
   setImages,
   currentProject,
   setCurrentProject,
-  selectedMediaCount = 0,
   onImageClick,
   onContinue
 }: UploadStageProps) {
@@ -271,7 +269,7 @@ export function UploadStage({
 
   return (
     <div className="flex flex-col">
-      <div className="p-6 space-y-4">
+      <div className="p-6">
         <DragDropZone
           onFilesSelected={handleFilesSelected}
           maxFiles={50}
@@ -291,7 +289,11 @@ export function UploadStage({
 
       {/* Continue Button - Sticky at bottom */}
       {isUploadInitiated && (
-        <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t">
+        <div
+          className={`sticky bottom-0 left-0 right-0 z-20 pt-4 ${
+            images.length <= 5 ? "mt-[12px]" : "pb-4"
+          } px-6 bg-white border-t`}
+        >
           <Button
             onClick={onContinue}
             disabled={!allUploadedOrError}

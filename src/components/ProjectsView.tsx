@@ -9,26 +9,12 @@ import {
 import { useState } from "react";
 import { EmptyState } from "./EmptyState";
 import { ProjectWorkflowModal } from "./modals/ProjectWorkflowModal";
-import { GeneratedContentCard } from "./GeneratedContentCard";
-import { TemplateMarketplaceModal } from "./modals/TemplateMarketplaceModal";
-import { useProjectGeneratedContent } from "@/hooks/useTemplates";
-import { getProjectImages } from "@/db/actions/images";
 import Image from "next/image";
 import { Project } from "@/types/schema";
 import HouseFallback from "@/../public/house_fallback.png";
 
 interface ProjectsViewProps {
   initialProjects: Project[];
-}
-
-// Separate component to handle generated content for a single project
-function ProjectGeneratedContent({ project }: { project: Project }) {
-  const { data: generatedContent, isLoading } = useProjectGeneratedContent(
-    project.id
-  );
-
-  // Return the data for parent to use
-  return { generatedContent, isLoading };
 }
 
 export function ProjectsView({ initialProjects }: ProjectsViewProps) {
@@ -38,9 +24,6 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
   const [filter, setFilter] = useState<"all" | "vertical" | "landscape">("all");
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
-  const [selectedProjectForTemplates, setSelectedProjectForTemplates] =
-    useState<Project | null>(null);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
   const handleCreateProject = () => {
     setIsWorkflowModalOpen(true);
@@ -53,48 +36,6 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
   const handleProjectCreated = (project: Project) => {
     setProjects([...projects, project]);
     setIsWorkflowModalOpen(false);
-  };
-
-  const handleProjectClick = async (project: Project) => {
-    // Only open template marketplace for draft projects
-    if (project.status !== "draft") {
-      // For non-draft projects, could open a project detail view
-      return;
-    }
-
-    try {
-      // Fetch project images to get available categories
-      const projectImages = await getProjectImages(project.id);
-      const categories = projectImages
-        .filter((img) => img.category)
-        .map((img) => img.category!)
-        .filter((category, index, self) => self.indexOf(category) === index); // unique
-
-      setAvailableCategories(categories);
-      setSelectedProjectForTemplates(project);
-    } catch (error) {
-      console.error("Failed to fetch project images:", error);
-      // Fallback: open marketplace with empty categories
-      setAvailableCategories([]);
-      setSelectedProjectForTemplates(project);
-    }
-  };
-
-  const handleRegenerateContent = (projectId: string) => {
-    const project = projects.find((p) => p.id === projectId);
-    if (project) {
-      handleProjectClick(project);
-    }
-  };
-
-  const handleTemplateMarketplaceClose = () => {
-    setSelectedProjectForTemplates(null);
-    setAvailableCategories([]);
-  };
-
-  const handleTemplateSelected = () => {
-    setSelectedProjectForTemplates(null);
-    setAvailableCategories([]);
   };
 
   const filteredProjects = projects.filter((project) => {
@@ -216,7 +157,6 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
                 className={`bg-white rounded-xl overflow-hidden border border-border hover:shadow-lg transition-shadow group ${
                   project.status === "draft" ? "cursor-pointer" : ""
                 }`}
-                onClick={() => handleProjectClick(project)}
               >
                 <div className="relative aspect-video bg-gradient-to-br from-[#d4c4b0] to-[#e8ddd3] overflow-hidden">
                   {project.format === "vertical" ? (
@@ -291,110 +231,11 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
         </>
       )}
 
-      {viewMode === "generated" && (
-        <GeneratedContentView
-          projects={projects}
-          onRegenerateContent={handleRegenerateContent}
-          onSwitchToProjects={() => setViewMode("projects")}
-        />
-      )}
-
       <ProjectWorkflowModal
         isOpen={isWorkflowModalOpen}
         onClose={handleCloseModal}
         onProjectCreated={handleProjectCreated}
       />
-
-      {selectedProjectForTemplates && (
-        <TemplateMarketplaceModal
-          isOpen={!!selectedProjectForTemplates}
-          onClose={handleTemplateMarketplaceClose}
-          projectId={selectedProjectForTemplates.id}
-          availableCategories={availableCategories}
-          onTemplateSelected={handleTemplateSelected}
-        />
-      )}
-    </div>
-  );
-}
-
-// Separate component for generated content view to properly use hooks
-function GeneratedContentView({
-  projects,
-  onRegenerateContent,
-  onSwitchToProjects
-}: {
-  projects: Project[];
-  onRegenerateContent: (projectId: string) => void;
-  onSwitchToProjects: () => void;
-}) {
-  // Fetch generated content for each project (hooks called at top level)
-  const projectsWithContent = projects.map((project) => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { data: generatedContent, isLoading } = useProjectGeneratedContent(
-      project.id
-    );
-    return { project, generatedContent, isLoading };
-  });
-
-  // Filter to only show projects with content
-  const projectsToShow = projectsWithContent.filter(
-    ({ generatedContent, isLoading }) =>
-      !isLoading && generatedContent && generatedContent.length > 0
-  );
-
-  const hasAnyContent = projectsToShow.length > 0;
-
-  if (!hasAnyContent) {
-    return (
-      <div className="text-center py-20">
-        <Sparkles className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-500 mb-2">No generated content yet</p>
-        <p className="text-sm text-gray-400 mb-6">
-          Create content from your projects using templates
-        </p>
-        <button
-          onClick={onSwitchToProjects}
-          className="text-purple-600 hover:text-purple-700"
-        >
-          View Projects
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-8">
-      {projectsToShow.map(({ project, generatedContent }) => (
-        <div key={project.id} className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">{project.title}</h3>
-              <p className="text-sm text-muted-foreground">
-                {generatedContent!.length} generated item
-                {generatedContent!.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-            <button
-              onClick={() => onRegenerateContent(project.id)}
-              className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1"
-            >
-              <Sparkles size={16} />
-              Generate More
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {generatedContent!.map((content) => (
-              <GeneratedContentCard
-                key={content.id}
-                content={content}
-                onRegenerate={() => onRegenerateContent(project.id)}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
