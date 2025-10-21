@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@stackframe/stack";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -19,48 +18,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
 import { ProjectNameInput } from "@/components/workflow/ProjectNameInput";
-import { WorkflowTimeline } from "@/components/workflow/WorkflowTimeline";
+import { UploadStage } from "@/components/workflow/stages/UploadStage";
+import { CategorizeStage } from "@/components/workflow/stages/CategorizeStage";
 import { PlanStage } from "@/components/workflow/stages/PlanStage";
 import { ReviewStage } from "@/components/workflow/stages/ReviewStage";
 import { GenerateStage } from "@/components/workflow/stages/GenerateStage";
-import { DragDropZone } from "@/components/DragDropZone";
-import { ImageUploadGrid } from "@/components/shared/ImageUploadGrid";
 import { ImagePreviewModal } from "@/components/modals/ImagePreviewModal";
-import { CategorizedImageGrid } from "@/components/image-grid/CategorizedImageGrid";
-import {
-  createProject,
-  updateProject,
-  getNextDraftNumber
-} from "@/db/actions/projects";
-import { saveImages } from "@/db/actions/images";
-import { uploadFiles, getProjectFolder } from "@/services/storage";
-import { imageProcessorService } from "@/services/imageProcessor";
-import { categorizeAndOrganizeImages } from "@/services/categorization";
 import { Project } from "@/types/schema";
-import type {
-  ProcessedImage,
-  ProcessingProgress,
-  SerializableImageData
-} from "@/types/images";
+import type { ProcessedImage } from "@/types/images";
 import type { CategorizedGroup } from "@/types/roomCategory";
 import type {
   WorkflowStage,
-  WorkflowState,
-  MediaSelection,
   GenerationProgress,
   GenerationStep
 } from "@/types/workflow";
-import { getCompletedStages } from "@/types/workflow";
-import { Progress } from "@/components/ui/progress";
 import {
   startGeneration,
   createProgressPoller
 } from "@/services/generationService";
-import { canProceedToStage } from "@/services/workflowValidation";
-import { useRef, useCallback } from "react";
+import { useRef } from "react";
+import { updateProject } from "@/db/actions/projects";
 
 interface ProjectWorkflowModalProps {
   isOpen: boolean;
@@ -73,8 +52,6 @@ export function ProjectWorkflowModal({
   onClose,
   onProjectCreated
 }: ProjectWorkflowModalProps) {
-  const user = useUser();
-
   // Workflow state
   const [currentStage, setCurrentStage] = useState<WorkflowStage>("upload");
   const [projectName, setProjectName] = useState("");
@@ -87,18 +64,22 @@ export function ProjectWorkflowModal({
     CategorizedGroup[]
   >([]);
 
-  // Media selection state
-  const [selectedMedia, setSelectedMedia] = useState<MediaSelection[]>([]);
+  // Video settings state
+  const [videoSettings, setVideoSettings] = useState<{
+    orientation: "landscape" | "vertical";
+    roomOrder: Array<{ id: string; name: string; imageCount: number }>;
+    logoFile: File | null;
+    logoPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+    scriptText: string;
+    enableSubtitles: boolean;
+    subtitleFont: string;
+    aiDirections: string;
+  } | null>(null);
 
   // Upload stage state
-  const [isLoadingPreviews, setIsLoadingPreviews] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<ProcessedImage | null>(null);
 
   // Categorize stage state
-  const [isCategorizing, setIsCategorizing] = useState(false);
-  const [processingProgress, setProcessingProgress] =
-    useState<ProcessingProgress | null>(null);
   const [previewImageFromGrid, setPreviewImageFromGrid] =
     useState<ProcessedImage | null>(null);
   const [previewIndexFromGrid, setPreviewIndexFromGrid] = useState<number>(0);
@@ -109,7 +90,7 @@ export function ProjectWorkflowModal({
   // Generate stage state
   const [generationProgress, setGenerationProgress] =
     useState<GenerationProgress | null>(null);
-  const [generationJobIds, setGenerationJobIds] = useState<string[]>([]);
+  const [_generationJobIds, setGenerationJobIds] = useState<string[]>([]);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
 
   // Internal modal state
@@ -136,7 +117,7 @@ export function ProjectWorkflowModal({
         setProjectName("");
         setImages([]);
         setCategorizedGroups([]);
-        setSelectedMedia([]);
+        setVideoSettings(null);
         setCurrentProject(null);
         setGenerationProgress(null);
         setGenerationJobIds([]);
@@ -154,12 +135,8 @@ export function ProjectWorkflowModal({
     };
   }, []);
 
-  // Get completed stages based on current stage
-  const completedStages = getCompletedStages(currentStage);
-
   // Check if there's work in progress
-  const hasWorkInProgress =
-    images.length > 0 || selectedMedia.length > 0 || currentStage !== "upload";
+  const hasWorkInProgress = images.length > 0 || currentStage !== "upload";
 
   // Handle modal close with confirmation
   const handleClose = () => {
@@ -202,266 +179,8 @@ export function ProjectWorkflowModal({
   }, [projectName, currentProject]);
 
   // ============================================================================
-  // Navigation Helpers
+  // Upload Stage Handlers
   // ============================================================================
-
-  /**
-   * Navigate to a stage with validation
-   */
-  const navigateToStage = (targetStage: WorkflowStage): boolean => {
-    const workflowState: WorkflowState = {
-      currentStage,
-      projectName,
-      currentProject,
-      images,
-      categorizedGroups,
-      selectedMedia,
-      isProcessing: isCategorizing || isUploading || isConfirming,
-      generationProgress
-    };
-
-    const validation = canProceedToStage(
-      currentStage,
-      targetStage,
-      workflowState
-    );
-
-    if (!validation.valid) {
-      // Show first error as toast
-      if (validation.errors.length > 0) {
-        toast.error("Cannot proceed", {
-          description: validation.errors[0]
-        });
-      }
-      return false;
-    }
-
-    setCurrentStage(targetStage);
-    return true;
-  };
-
-  // ============================================================================
-  // Project and Upload Handlers (from UploadProjectModal)
-  // ============================================================================
-
-  const createNewProject = async () => {
-    if (!user) {
-      toast.error("Authentication required", {
-        description: "Please sign in to create a project."
-      });
-      return null;
-    }
-
-    try {
-      const newProject = await createProject();
-      setCurrentProject(newProject);
-      console.log("Project created:", newProject);
-      return newProject;
-    } catch (error) {
-      console.error("Failed to create project:", error);
-      toast.error("Failed to create project", {
-        description:
-          error instanceof Error ? error.message : "An unknown error occurred"
-      });
-      return null;
-    }
-  };
-
-  const handleFilesSelected = async (files: File[]) => {
-    if (!user) {
-      toast.error("Authentication required", {
-        description: "Please sign in to upload images and create projects."
-      });
-      return;
-    }
-
-    setIsLoadingPreviews(true);
-    try {
-      const imageDataArray = await imageProcessorService.createImageDataArray(
-        files
-      );
-
-      setImages((prev) => {
-        const existingFilenames = new Set(prev.map((img) => img.file.name));
-        const newImages = imageDataArray.filter(
-          (img) => !existingFilenames.has(img.file.name)
-        );
-
-        const duplicateCount = imageDataArray.length - newImages.length;
-        if (duplicateCount > 0) {
-          toast.info(`Skipped ${duplicateCount} duplicate image(s)`);
-        }
-
-        return [...prev, ...newImages];
-      });
-
-      const existingFilenames = new Set(images.map((img) => img.file.name));
-      const newImagesToUpload = imageDataArray.filter(
-        (img) => !existingFilenames.has(img.file.name)
-      );
-
-      if (newImagesToUpload.length > 0) {
-        await handleUploadImages(newImagesToUpload);
-      }
-    } catch (error) {
-      console.error("Error generating previews:", error);
-      toast.error("Failed to load images", {
-        description:
-          error instanceof Error ? error.message : "An unknown error occurred"
-      });
-    } finally {
-      setIsLoadingPreviews(false);
-    }
-  };
-
-  const handleUploadImages = async (imageDataArray: ProcessedImage[]) => {
-    if (!user) {
-      toast.error("Authentication required", {
-        description: "Please sign in to upload images."
-      });
-      return;
-    }
-
-    let project = currentProject;
-
-    if (!project) {
-      project = await createNewProject();
-    }
-
-    if (!project) {
-      console.error("No project available");
-      toast.error("Upload failed", {
-        description: "Unable to create project. Please try again."
-      });
-      return;
-    }
-
-    setIsUploading(true);
-
-    try {
-      const folder = getProjectFolder(project.id, user.id);
-
-      for (let i = 0; i < imageDataArray.length; i++) {
-        const imageData = imageDataArray[i];
-
-        setImages((prev) =>
-          prev.map((img) =>
-            img.id === imageData.id
-              ? { ...img, status: "uploading" as const }
-              : img
-          )
-        );
-
-        try {
-          const uploadResult = await uploadFiles([imageData.file], folder);
-          const result = uploadResult[0];
-
-          if (result.status === "success") {
-            setImages((prev) =>
-              prev.map((img) =>
-                img.id === imageData.id
-                  ? {
-                      ...img,
-                      status: "uploaded" as const,
-                      uploadUrl: result.url
-                    }
-                  : img
-              )
-            );
-          } else {
-            setImages((prev) =>
-              prev.map((img) =>
-                img.id === imageData.id
-                  ? {
-                      ...img,
-                      status: "error" as const,
-                      error: result.error
-                    }
-                  : img
-              )
-            );
-          }
-        } catch (error) {
-          setImages((prev) =>
-            prev.map((img) =>
-              img.id === imageData.id
-                ? {
-                    ...img,
-                    status: "error" as const,
-                    error:
-                      error instanceof Error ? error.message : "Upload failed"
-                  }
-                : img
-            )
-          );
-        }
-      }
-
-      console.log("All uploads completed");
-    } catch (error) {
-      console.error("Error uploading images:", error);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleRetryUpload = async (imageId: string) => {
-    const imageToRetry = images.find((img) => img.id === imageId);
-    if (!imageToRetry || !currentProject || !user) return;
-
-    const folder = getProjectFolder(currentProject.id, user.id);
-
-    setImages((prev) =>
-      prev.map((img) =>
-        img.id === imageId
-          ? { ...img, status: "uploading" as const, error: undefined }
-          : img
-      )
-    );
-
-    try {
-      const uploadResult = await uploadFiles([imageToRetry.file], folder);
-      const result = uploadResult[0];
-
-      if (result.status === "success") {
-        setImages((prev) =>
-          prev.map((img) =>
-            img.id === imageId
-              ? {
-                  ...img,
-                  status: "uploaded" as const,
-                  uploadUrl: result.url
-                }
-              : img
-          )
-        );
-      } else {
-        setImages((prev) =>
-          prev.map((img) =>
-            img.id === imageId
-              ? { ...img, status: "error" as const, error: result.error }
-              : img
-          )
-        );
-      }
-    } catch (error) {
-      setImages((prev) =>
-        prev.map((img) =>
-          img.id === imageId
-            ? {
-                ...img,
-                status: "error" as const,
-                error: error instanceof Error ? error.message : "Upload failed"
-              }
-            : img
-        )
-      );
-    }
-  };
-
-  const handleRemoveImage = (imageId: string) => {
-    setImages((prev) => prev.filter((img) => img.id !== imageId));
-  };
 
   const handleImageClick = (imageId: string) => {
     const image = images.find((img) => img.id === imageId);
@@ -480,90 +199,8 @@ export function ProjectWorkflowModal({
   // Stage Navigation Handlers
   // ============================================================================
 
-  const handleContinueFromUpload = async () => {
-    if (!user || !currentProject) {
-      toast.error("No project found", {
-        description: "Please try uploading images again."
-      });
-      return;
-    }
-
-    const allReady = images.every(
-      (img) =>
-        img.status === "uploaded" ||
-        img.status === "analyzed" ||
-        img.status === "error"
-    );
-    if (!allReady) {
-      toast.warning("Images still uploading", {
-        description: "Please wait for all images to finish uploading."
-      });
-      return;
-    }
-
-    setIsCategorizing(true);
+  const handleContinueFromUpload = () => {
     setCurrentStage("categorize");
-    setProcessingProgress(null);
-
-    try {
-      await updateProject(currentProject.id, { status: "analyzing" });
-
-      const alreadyAnalyzed = images.filter(
-        (img) =>
-          img.classification &&
-          (img.status === "uploaded" || img.status === "analyzed")
-      );
-      const needsAnalysis = images.filter(
-        (img) => !img.classification && img.status === "uploaded" && !img.error
-      );
-
-      let finalImages: ProcessedImage[];
-
-      if (needsAnalysis.length > 0) {
-        const result = await imageProcessorService.processImages(
-          needsAnalysis,
-          currentProject.id,
-          {
-            onProgress: (progress) => {
-              setProcessingProgress(progress);
-
-              if (progress.currentImage) {
-                setImages((prev) =>
-                  prev.map((img) =>
-                    img.id === progress.currentImage?.id
-                      ? progress.currentImage
-                      : img
-                  )
-                );
-              }
-            }
-          }
-        );
-
-        finalImages = [...alreadyAnalyzed, ...result.images];
-      } else {
-        finalImages = alreadyAnalyzed;
-      }
-
-      setImages(finalImages);
-
-      const organized = categorizeAndOrganizeImages(finalImages);
-      setCategorizedGroups(organized.groups);
-
-      // Stay on categorize stage to show the grid
-    } catch (error) {
-      console.error("Error processing images:", error);
-      toast.error("Failed to process images", {
-        description:
-          error instanceof Error
-            ? error.message
-            : "An error occurred during image processing. Please try again."
-      });
-      setCurrentStage("upload");
-    } finally {
-      setIsCategorizing(false);
-      setProcessingProgress(null);
-    }
   };
 
   const handleContinueFromCategorize = () => {
@@ -574,33 +211,21 @@ export function ProjectWorkflowModal({
     setCurrentStage("categorize");
   };
 
-  const handleBackToPlan = () => {
-    setCurrentStage("review");
-  };
-
   // ============================================================================
-  // Media Selection Handlers
+  // Plan Stage Handlers
   // ============================================================================
 
-  const handleMediaSelect = (selection: MediaSelection) => {
-    setSelectedMedia((prev) => [...prev, selection]);
-  };
-
-  const handleMediaDeselect = (mediaType: string, templateId: string) => {
-    setSelectedMedia((prev) =>
-      prev.filter(
-        (s) => !(s.mediaType === mediaType && s.templateId === templateId)
-      )
-    );
-  };
-
-  const handleContinueFromPlan = () => {
-    if (selectedMedia.length === 0) {
-      toast.error("No media selected", {
-        description: "Please select at least one template to generate."
-      });
-      return;
-    }
+  const handleContinueFromPlan = (settings: {
+    orientation: "landscape" | "vertical";
+    roomOrder: Array<{ id: string; name: string; imageCount: number }>;
+    logoFile: File | null;
+    logoPosition: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+    scriptText: string;
+    enableSubtitles: boolean;
+    subtitleFont: string;
+    aiDirections: string;
+  }) => {
+    setVideoSettings(settings);
     setCurrentStage("review");
   };
 
@@ -615,22 +240,29 @@ export function ProjectWorkflowModal({
     setIsConfirming(true);
 
     try {
+      // Validate video settings
+      if (!videoSettings) {
+        throw new Error("Video settings are required");
+      }
+
       // Start generation
       const result = await startGeneration({
         projectId: currentProject.id,
-        selections: selectedMedia
+        videoSettings: videoSettings
       });
 
       if (!result.success) {
         throw new Error(result.error || "Failed to start generation");
       }
 
-      // Initialize generation progress
-      const steps: GenerationStep[] = selectedMedia.map((media, index) => ({
-        id: result.jobIds[index] || `job-${index}`,
-        label: `Generating ${media.template.title}`,
-        status: "waiting" as const
-      }));
+      // Initialize generation progress with single video generation step
+      const steps: GenerationStep[] = [
+        {
+          id: result.jobIds[0] || "job-0",
+          label: `Generating ${videoSettings.orientation} video`,
+          status: "waiting" as const
+        }
+      ];
 
       setGenerationProgress({
         currentStep: steps[0]?.label || "Starting...",
@@ -696,11 +328,11 @@ export function ProjectWorkflowModal({
   // Determine modal size based on current stage
   const getModalClassName = () => {
     if (currentStage === "generate") {
-      return "max-w-3xl h-[90vh]";
+      return "max-w-5xl h-[92vh]";
     }
     return cn(
-      "max-w-2xl h-[90vh]",
-      "sm:max-w-2xl sm:h-[90vh]",
+      "max-w-4xl h-[92vh]",
+      "sm:max-w-4xl sm:h-[92vh]",
       "max-sm:w-screen max-sm:h-screen max-sm:rounded-none"
     );
   };
@@ -710,22 +342,6 @@ export function ProjectWorkflowModal({
     .filter((img) => img.classification?.category)
     .map((img) => img.classification!.category)
     .filter((category, index, self) => self.indexOf(category) === index);
-
-  // Check if we can continue from upload
-  const isUploadInitiated = images.length > 0;
-  const canContinueFromUpload =
-    isUploadInitiated &&
-    images.some(
-      (img) => img.status === "uploaded" || img.status === "analyzed"
-    );
-  const allUploadedOrError =
-    isUploadInitiated &&
-    images.every(
-      (img) =>
-        img.status === "uploaded" ||
-        img.status === "analyzed" ||
-        img.status === "error"
-    );
 
   return (
     <>
@@ -737,309 +353,131 @@ export function ProjectWorkflowModal({
           )}
         >
           {/* Modal Header - Fixed */}
-          <DialogHeader className="max-w-2xl border-b">
+          <DialogHeader className="border-b">
             <ProjectNameInput
               value={projectName}
               onChange={setProjectName}
               placeholder="Untitled Project"
               isSaving={isSavingName}
             />
-            <WorkflowTimeline
-              currentStage={currentStage}
-              completedStages={completedStages}
-            />
+            {/* Header */}
+            <div className="sticky top-0 bg-white z-30 px-6 py-4 border-t">
+              {currentStage === "upload" && (
+                <>
+                  <h2 className="text-xl font-semibold">
+                    Choose Images to Upload
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Click to upload or drag and drop images of your property
+                    listing to generate content from.
+                  </p>
+                </>
+              )}
+              {currentStage === "categorize" &&
+                categorizedGroups.length > 0 && (
+                  <>
+                    <h2 className="text-xl font-semibold">
+                      Review Categorized Images
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {categorizedGroups.length} categories found with{" "}
+                      {images.filter((img) => img.classification).length} images
+                    </p>
+                  </>
+                )}
+              {currentStage === "plan" && (
+                <>
+                  <h2 className="text-xl font-semibold">
+                    Configure Your Video
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Customize your property walkthrough video settings
+                  </p>
+                </>
+              )}
+              {currentStage === "review" && (
+                <>
+                  <h2 className="text-xl font-semibold">Review Your Project</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Confirm your images and selected media before generating
+                  </p>
+                </>
+              )}
+            </div>
             <DialogTitle className="hidden">Project Workflow</DialogTitle>
           </DialogHeader>
 
           {/* Stage Content - Scrollable */}
           <div className="relative flex-1 overflow-auto">
-            <div className="h-full">
-              {/* Upload Stage */}
-              {currentStage === "upload" && (
-                <>
-                  {" "}
-                  {/* Header */}
-                  <div className="sticky top-0 bg-white z-30 px-6 py-4 border-b">
-                    <h2 className="text-xl font-semibold">
-                      Choose Images to Upload
-                    </h2>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Click to upload or drag and drop images of your property
-                      listing to generate content from.
-                    </p>
-                    {selectedMedia.length > 0 && (
-                      <p className="text-sm text-primary font-medium mt-2">
-                        {selectedMedia.length}{" "}
-                        {selectedMedia.length === 1 ? "item" : "items"} selected
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col">
-                    <div className={`p-6 space-y-4`}>
-                      <DragDropZone
-                        onFilesSelected={handleFilesSelected}
-                        maxFiles={50}
-                        maxFileSize={10 * 1024 * 1024} // 10MB
-                        acceptedFormats={[".jpg", ".jpeg", ".png", ".webp"]}
-                        isDisabled={isLoadingPreviews}
-                        isUploadInitiated={isUploadInitiated}
-                      />
+            {/* Upload Stage */}
+            {currentStage === "upload" && (
+              <UploadStage
+                images={images}
+                setImages={setImages}
+                currentProject={currentProject}
+                setCurrentProject={setCurrentProject}
+                onImageClick={handleImageClick}
+                onContinue={handleContinueFromUpload}
+              />
+            )}
 
-                      <ImageUploadGrid
-                        images={images}
-                        onRemove={handleRemoveImage}
-                        onRetry={handleRetryUpload}
-                        onImageClick={handleImageClick}
-                      />
-                    </div>
+            {/* Categorize Stage */}
+            {currentStage === "categorize" && (
+              <CategorizeStage
+                images={images}
+                setImages={setImages}
+                currentProject={currentProject}
+                categorizedGroups={categorizedGroups}
+                setCategorizedGroups={setCategorizedGroups}
+                onImageClick={(image, categoryIndex, imageIndex) => {
+                  // Find the global index of the image in all images
+                  let globalIndex = 0;
+                  for (let i = 0; i < categoryIndex; i++) {
+                    globalIndex += categorizedGroups[i].images.length;
+                  }
+                  globalIndex += imageIndex;
 
-                    {/* Continue Button - Sticky at bottom */}
-                    {canContinueFromUpload && (
-                      <>
-                        <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t">
-                          <Button
-                            onClick={handleContinueFromUpload}
-                            disabled={!allUploadedOrError || isCategorizing}
-                            className="w-full"
-                            size="lg"
-                          >
-                            {isCategorizing
-                              ? "Processing..."
-                              : !allUploadedOrError
-                              ? "Waiting for uploads to complete..."
-                              : `Continue with ${
-                                  images.filter(
-                                    (img) =>
-                                      img.status === "uploaded" ||
-                                      img.status === "analyzed"
-                                  ).length
-                                } image(s)`}
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
+                  setPreviewImageFromGrid(image);
+                  setPreviewIndexFromGrid(globalIndex);
+                  setInternalIsOpen(false);
+                }}
+                onContinue={handleContinueFromCategorize}
+                onBack={() => setCurrentStage("upload")}
+              />
+            )}
 
-              {/* Categorize Stage */}
-              {currentStage === "categorize" && (
-                <>
-                  {isCategorizing ? (
-                    <div className="h-full flex flex-col items-center justify-center p-6">
-                      <div className="w-full max-w-md space-y-4">
-                        <div className="text-center">
-                          <h3 className="text-lg font-semibold mb-2">
-                            {processingProgress?.phase === "uploading" &&
-                              "Uploading images..."}
-                            {processingProgress?.phase === "analyzing" &&
-                              "Analyzing with AI..."}
-                            {processingProgress?.phase === "categorizing" &&
-                              "Organizing categories..."}
-                            {processingProgress?.phase === "complete" &&
-                              "Processing complete!"}
-                            {!processingProgress && "Starting..."}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            {processingProgress
-                              ? `${processingProgress.completed} of ${processingProgress.total} images`
-                              : "Please wait..."}
-                          </p>
-                        </div>
+            {/* Plan Stage */}
+            {currentStage === "plan" && (
+              <PlanStage
+                categorizedGroups={categorizedGroups}
+                availableCategories={availableCategories}
+                onContinue={handleContinueFromPlan}
+                onBack={handleBackToCategorize}
+              />
+            )}
 
-                        <div className="space-y-2">
-                          <Progress
-                            value={processingProgress?.overallProgress || 0}
-                            className="h-3"
-                          />
-                          <p className="text-xs text-center text-muted-foreground">
-                            {processingProgress?.overallProgress
-                              ? `${Math.round(
-                                  processingProgress.overallProgress
-                                )}%`
-                              : "0%"}
-                          </p>
-                        </div>
+            {/* Review Stage */}
+            {currentStage === "review" && (
+              <ReviewStage
+                images={images}
+                categorizedGroups={categorizedGroups}
+                videoSettings={videoSettings || undefined}
+                onConfirm={handleConfirmAndGenerate}
+                onBack={() => setCurrentStage("plan")}
+                isConfirming={isConfirming}
+              />
+            )}
 
-                        {processingProgress?.currentImage && (
-                          <div className="text-xs text-center text-muted-foreground">
-                            Processing:{" "}
-                            {processingProgress.currentImage.file.name}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col overflow-auto">
-                      <div className="p-6 space-y-4 flex-1">
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <h3 className="text-lg font-semibold">
-                              Review Categorized Images
-                            </h3>
-                            <p className="text-sm text-muted-foreground">
-                              {categorizedGroups.length} categories found with{" "}
-                              {
-                                images.filter((img) => img.classification)
-                                  .length
-                              }{" "}
-                              images
-                            </p>
-                          </div>
-                        </div>
-
-                        <CategorizedImageGrid
-                          groups={categorizedGroups}
-                          enablePreview={false}
-                          enableDragDrop={true}
-                          showConfidence={true}
-                          showPreviewMetadata={true}
-                          onImageClick={(image, categoryIndex, imageIndex) => {
-                            // Find the global index of the image in all images
-                            let globalIndex = 0;
-                            for (let i = 0; i < categoryIndex; i++) {
-                              globalIndex += categorizedGroups[i].images.length;
-                            }
-                            globalIndex += imageIndex;
-
-                            setPreviewImageFromGrid(image);
-                            setPreviewIndexFromGrid(globalIndex);
-                            setInternalIsOpen(false);
-                          }}
-                          onRecategorize={(
-                            imageId,
-                            fromCategoryIndex,
-                            toCategoryIndex
-                          ) => {
-                            // Find the image in the source category
-                            const fromGroup =
-                              categorizedGroups[fromCategoryIndex];
-                            const toGroup = categorizedGroups[toCategoryIndex];
-
-                            if (!fromGroup || !toGroup) return;
-
-                            const imageIndex = fromGroup.images.findIndex(
-                              (img) => img.id === imageId
-                            );
-                            if (imageIndex === -1) return;
-
-                            const movedImage = fromGroup.images[imageIndex];
-
-                            // Update the image's classification to match new category
-                            const updatedImage: ProcessedImage = {
-                              ...movedImage,
-                              classification: {
-                                ...movedImage.classification!,
-                                category: toGroup.category
-                              }
-                            };
-
-                            // Create new groups array with updated images
-                            const newGroups = [...categorizedGroups];
-
-                            // Remove from source category
-                            newGroups[fromCategoryIndex] = {
-                              ...fromGroup,
-                              images: fromGroup.images.filter(
-                                (img) => img.id !== imageId
-                              )
-                            };
-
-                            // Add to destination category
-                            newGroups[toCategoryIndex] = {
-                              ...toGroup,
-                              images: [...toGroup.images, updatedImage],
-                              avgConfidence:
-                                [...toGroup.images, updatedImage].reduce(
-                                  (sum, img) =>
-                                    sum + (img.classification?.confidence || 0),
-                                  0
-                                ) /
-                                (toGroup.images.length + 1)
-                            };
-
-                            // Filter out empty groups
-                            const filteredGroups = newGroups.filter(
-                              (group) => group.images.length > 0
-                            );
-
-                            // Update categorized groups
-                            setCategorizedGroups(filteredGroups);
-
-                            // Also update the images array to reflect the classification change
-                            setImages((prev) =>
-                              prev.map((img) =>
-                                img.id === imageId ? updatedImage : img
-                              )
-                            );
-
-                            toast.success("Image recategorized", {
-                              description: `Moved to ${toGroup.displayLabel}`
-                            });
-                          }}
-                        />
-                      </div>
-
-                      {/* Fade overlay and sticky footer */}
-                      <>
-                        <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-12 bg-gradient-to-t from-white via-white to-transparent" />
-                        <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t flex gap-3">
-                          <Button
-                            onClick={() => setCurrentStage("upload")}
-                            variant="outline"
-                            className="flex-1"
-                          >
-                            Back to Upload
-                          </Button>
-                          <Button
-                            onClick={handleContinueFromCategorize}
-                            className="flex-1"
-                          >
-                            Continue to Planning
-                          </Button>
-                        </div>
-                      </>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Plan Stage */}
-              {currentStage === "plan" && (
-                <PlanStage
-                  onMediaSelect={handleMediaSelect}
-                  onMediaDeselect={handleMediaDeselect}
-                  selectedMedia={selectedMedia}
-                  availableCategories={availableCategories}
-                  onContinue={handleContinueFromPlan}
-                  onBack={handleBackToCategorize}
-                />
-              )}
-
-              {/* Review Stage */}
-              {currentStage === "review" && (
-                <ReviewStage
-                  images={images}
-                  categorizedGroups={categorizedGroups}
-                  selectedMedia={selectedMedia}
-                  onConfirm={handleConfirmAndGenerate}
-                  onBack={() => setCurrentStage("plan")}
-                  isConfirming={isConfirming}
-                />
-              )}
-
-              {/* Generate Stage */}
-              {currentStage === "generate" && generationProgress && (
-                <GenerateStage
-                  progress={generationProgress}
-                  selectedMedia={selectedMedia}
-                  onCancel={() => {
-                    setCurrentStage("review");
-                    setGenerationProgress(null);
-                  }}
-                />
-              )}
-            </div>
+            {/* Generate Stage */}
+            {currentStage === "generate" && generationProgress && (
+              <GenerateStage
+                progress={generationProgress}
+                onCancel={() => {
+                  setCurrentStage("review");
+                  setGenerationProgress(null);
+                }}
+              />
+            )}
           </div>
         </DialogContent>
 
@@ -1125,8 +563,8 @@ export function ProjectWorkflowModal({
             <AlertDialogTitle>Close Project Workflow?</AlertDialogTitle>
             <AlertDialogDescription>
               You have unsaved work in progress. Are you sure you want to close?
-              Your progress will be saved, but you'll need to start the workflow
-              again.
+              Your progress will be saved, but you&apos;ll need to start the
+              workflow again.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
