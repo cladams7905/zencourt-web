@@ -11,7 +11,7 @@ import {
   DialogTitle
 } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { DragDropZone } from "./DragDropZone";
+import { DragDropZone } from "./workflow/DragDropZone";
 import { ImageUploadGrid } from "./shared/ImageUploadGrid";
 import { ImagePreviewModal } from "./modals/ImagePreviewModal";
 import { CategorizedImageGrid } from "./image-grid/CategorizedImageGrid";
@@ -546,303 +546,314 @@ export function UploadProjectModal({
 
   return (
     <>
-    <Dialog open={internalIsOpen} onOpenChange={onClose}>
-      <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto pb-0`}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Create New Project</DialogTitle>
-          <DialogDescription>
-            Upload property images to create an AI-generated video walkthrough
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog open={internalIsOpen} onOpenChange={onClose}>
+        <DialogContent
+          className={`max-w-4xl max-h-[90vh] overflow-y-auto pb-0`}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Create New Project</DialogTitle>
+            <DialogDescription>
+              Upload property images to create an AI-generated video walkthrough
+            </DialogDescription>
+          </DialogHeader>
 
-        {step === "upload" && (
-          <>
-            <DragDropZone
-              onFilesSelected={handleFilesSelected}
-              maxFiles={50}
-              maxFileSize={10 * 1024 * 1024} // 10MB
-              acceptedFormats={[".jpg", ".jpeg", ".png", ".webp"]}
-              isDisabled={isLoadingPreviews}
-            />
+          {step === "upload" && (
+            <>
+              <DragDropZone
+                onFilesSelected={handleFilesSelected}
+                maxFiles={50}
+                maxFileSize={10 * 1024 * 1024} // 10MB
+                acceptedFormats={[".jpg", ".jpeg", ".png", ".webp"]}
+                isDisabled={isLoadingPreviews}
+              />
 
-            <ImageUploadGrid
-              images={images}
-              onRemove={handleRemoveImage}
-              onRetry={handleRetryUpload}
-              onImageClick={handleImageClick}
-            />
+              <ImageUploadGrid
+                images={images}
+                onRemove={handleRemoveImage}
+                onRetry={handleRetryUpload}
+                onImageClick={handleImageClick}
+              />
 
-            {/* Continue Button - Sticky at bottom */}
-            {canContinue && (
-              <>
-                {/* Fade overlay sitting ABOVE the sticky footer */}
-                <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-12 bg-gradient-to-t from-white via-white to-transparent" />
+              {/* Continue Button - Sticky at bottom */}
+              {canContinue && (
+                <>
+                  {/* Fade overlay sitting ABOVE the sticky footer */}
+                  <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-12 bg-gradient-to-t from-white via-white to-transparent" />
 
-                {/* Sticky footer */}
-                <div className="sticky bottom-0 left-0 right-0 z-20 pt-0 pb-4 bg-white">
-                  <Button
-                    onClick={handleContinue}
-                    disabled={!allUploadedOrError || isCategorizing}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isCategorizing
-                      ? "Processing..."
-                      : !allUploadedOrError
-                      ? "Waiting for uploads to complete..."
-                      : `Continue with ${
-                          images.filter(
-                            (img) =>
-                              img.status === "uploaded" ||
-                              img.status === "analyzed"
-                          ).length
-                        } image(s)`}
-                  </Button>
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {step === "categorizing" && (
-          <div className="flex flex-col items-center justify-center min-h-[300px] space-y-6">
-            <div className="w-full max-w-md space-y-4">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold mb-2">
-                  {processingProgress?.phase === "uploading" &&
-                    "Uploading images..."}
-                  {processingProgress?.phase === "analyzing" &&
-                    "Analyzing with AI..."}
-                  {processingProgress?.phase === "categorizing" &&
-                    "Organizing categories..."}
-                  {processingProgress?.phase === "complete" &&
-                    "Processing complete!"}
-                  {!processingProgress && "Starting..."}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {processingProgress
-                    ? `${processingProgress.completed} of ${processingProgress.total} images`
-                    : "Please wait..."}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Progress
-                  value={processingProgress?.overallProgress || 0}
-                  className="h-3"
-                />
-                <p className="text-xs text-center text-muted-foreground">
-                  {processingProgress?.overallProgress
-                    ? `${Math.round(processingProgress.overallProgress)}%`
-                    : "0%"}
-                </p>
-              </div>
-
-              {processingProgress?.currentImage && (
-                <div className="text-xs text-center text-muted-foreground">
-                  Processing: {processingProgress.currentImage.file.name}
-                </div>
+                  {/* Sticky footer */}
+                  <div className="sticky bottom-0 left-0 right-0 z-20 pt-0 pb-4 bg-white">
+                    <Button
+                      onClick={handleContinue}
+                      disabled={!allUploadedOrError || isCategorizing}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isCategorizing
+                        ? "Processing..."
+                        : !allUploadedOrError
+                        ? "Waiting for uploads to complete..."
+                        : `Continue with ${
+                            images.filter(
+                              (img) =>
+                                img.status === "uploaded" ||
+                                img.status === "analyzed"
+                            ).length
+                          } image(s)`}
+                    </Button>
+                  </div>
+                </>
               )}
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {step === "review" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">
-                  Review Categorized Images
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {categorizedGroups.length} categories found with{" "}
-                  {images.filter((img) => img.classification).length} images
-                </p>
+          {step === "categorizing" && (
+            <div className="flex flex-col items-center justify-center min-h-[300px] space-y-6">
+              <div className="w-full max-w-md space-y-4">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold mb-2">
+                    {processingProgress?.phase === "uploading" &&
+                      "Uploading images..."}
+                    {processingProgress?.phase === "analyzing" &&
+                      "Analyzing with AI..."}
+                    {processingProgress?.phase === "categorizing" &&
+                      "Organizing categories..."}
+                    {processingProgress?.phase === "complete" &&
+                      "Processing complete!"}
+                    {!processingProgress && "Starting..."}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {processingProgress
+                      ? `${processingProgress.completed} of ${processingProgress.total} images`
+                      : "Please wait..."}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Progress
+                    value={processingProgress?.overallProgress || 0}
+                    className="h-3"
+                  />
+                  <p className="text-xs text-center text-muted-foreground">
+                    {processingProgress?.overallProgress
+                      ? `${Math.round(processingProgress.overallProgress)}%`
+                      : "0%"}
+                  </p>
+                </div>
+
+                {processingProgress?.currentImage && (
+                  <div className="text-xs text-center text-muted-foreground">
+                    Processing: {processingProgress.currentImage.file.name}
+                  </div>
+                )}
               </div>
             </div>
+          )}
 
-            <CategorizedImageGrid
-              groups={categorizedGroups}
-              enablePreview={false}
-              enableDragDrop={true}
-              showConfidence={true}
-              showPreviewMetadata={true}
-              onImageClick={(image, categoryIndex, imageIndex) => {
-                // Find the global index of the image in all images
-                let globalIndex = 0;
-                for (let i = 0; i < categoryIndex; i++) {
-                  globalIndex += categorizedGroups[i].images.length;
-                }
-                globalIndex += imageIndex;
+          {step === "review" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    Review Categorized Images
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {categorizedGroups.length} categories found with{" "}
+                    {images.filter((img) => img.classification).length} images
+                  </p>
+                </div>
+              </div>
 
-                setPreviewImageFromGrid(image);
-                setPreviewIndexFromGrid(globalIndex);
-                setInternalIsOpen(false);
-              }}
-              onRecategorize={(imageId, fromCategoryIndex, toCategoryIndex) => {
-                // Find the image in the source category
-                const fromGroup = categorizedGroups[fromCategoryIndex];
-                const toGroup = categorizedGroups[toCategoryIndex];
-
-                if (!fromGroup || !toGroup) return;
-
-                const imageIndex = fromGroup.images.findIndex(
-                  (img) => img.id === imageId
-                );
-                if (imageIndex === -1) return;
-
-                const movedImage = fromGroup.images[imageIndex];
-
-                // Update the image's classification to match new category
-                const updatedImage: ProcessedImage = {
-                  ...movedImage,
-                  classification: {
-                    ...movedImage.classification!,
-                    category: toGroup.category
+              <CategorizedImageGrid
+                groups={categorizedGroups}
+                enablePreview={false}
+                enableDragDrop={true}
+                showConfidence={true}
+                showPreviewMetadata={true}
+                onImageClick={(image, categoryIndex, imageIndex) => {
+                  // Find the global index of the image in all images
+                  let globalIndex = 0;
+                  for (let i = 0; i < categoryIndex; i++) {
+                    globalIndex += categorizedGroups[i].images.length;
                   }
-                };
+                  globalIndex += imageIndex;
 
-                // Create new groups array with updated images
-                const newGroups = [...categorizedGroups];
+                  setPreviewImageFromGrid(image);
+                  setPreviewIndexFromGrid(globalIndex);
+                  setInternalIsOpen(false);
+                }}
+                onRecategorize={(
+                  imageId,
+                  fromCategoryIndex,
+                  toCategoryIndex
+                ) => {
+                  // Find the image in the source category
+                  const fromGroup = categorizedGroups[fromCategoryIndex];
+                  const toGroup = categorizedGroups[toCategoryIndex];
 
-                // Remove from source category
-                newGroups[fromCategoryIndex] = {
-                  ...fromGroup,
-                  images: fromGroup.images.filter((img) => img.id !== imageId)
-                };
+                  if (!fromGroup || !toGroup) return;
 
-                // Add to destination category
-                newGroups[toCategoryIndex] = {
-                  ...toGroup,
-                  images: [...toGroup.images, updatedImage],
-                  avgConfidence:
-                    [...toGroup.images, updatedImage].reduce(
-                      (sum, img) => sum + (img.classification?.confidence || 0),
-                      0
-                    ) /
-                    (toGroup.images.length + 1)
-                };
+                  const imageIndex = fromGroup.images.findIndex(
+                    (img) => img.id === imageId
+                  );
+                  if (imageIndex === -1) return;
 
-                // Filter out empty groups
-                const filteredGroups = newGroups.filter(
-                  (group) => group.images.length > 0
-                );
+                  const movedImage = fromGroup.images[imageIndex];
 
-                // Update categorized groups
-                setCategorizedGroups(filteredGroups);
+                  // Update the image's classification to match new category
+                  const updatedImage: ProcessedImage = {
+                    ...movedImage,
+                    classification: {
+                      ...movedImage.classification!,
+                      category: toGroup.category
+                    }
+                  };
 
-                // Also update the images array to reflect the classification change
-                setImages((prev) =>
-                  prev.map((img) => (img.id === imageId ? updatedImage : img))
-                );
+                  // Create new groups array with updated images
+                  const newGroups = [...categorizedGroups];
 
-                toast.success("Image recategorized", {
-                  description: `Moved to ${toGroup.displayLabel}`
-                });
-              }}
-            />
+                  // Remove from source category
+                  newGroups[fromCategoryIndex] = {
+                    ...fromGroup,
+                    images: fromGroup.images.filter((img) => img.id !== imageId)
+                  };
 
-            {/* Fade overlay sitting ABOVE the sticky footer */}
-            <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-10 bg-gradient-to-t from-white via-white to-transparent" />
+                  // Add to destination category
+                  newGroups[toCategoryIndex] = {
+                    ...toGroup,
+                    images: [...toGroup.images, updatedImage],
+                    avgConfidence:
+                      [...toGroup.images, updatedImage].reduce(
+                        (sum, img) =>
+                          sum + (img.classification?.confidence || 0),
+                        0
+                      ) /
+                      (toGroup.images.length + 1)
+                  };
 
-            {/* Sticky footer */}
-            <div className="sticky bottom-0 left-0 right-0 z-20 pt-0 pb-4 bg-white flex gap-3">
-              <Button
-                onClick={() => setStep("upload")}
-                variant="outline"
-                className="flex-1"
-              >
-                Back to Upload
-              </Button>
-              <Button onClick={handleSaveDraft} className="flex-1">
-                Save Draft Project
-              </Button>
+                  // Filter out empty groups
+                  const filteredGroups = newGroups.filter(
+                    (group) => group.images.length > 0
+                  );
+
+                  // Update categorized groups
+                  setCategorizedGroups(filteredGroups);
+
+                  // Also update the images array to reflect the classification change
+                  setImages((prev) =>
+                    prev.map((img) => (img.id === imageId ? updatedImage : img))
+                  );
+
+                  toast.success("Image recategorized", {
+                    description: `Moved to ${toGroup.displayLabel}`
+                  });
+                }}
+              />
+
+              {/* Fade overlay sitting ABOVE the sticky footer */}
+              <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-10 bg-gradient-to-t from-white via-white to-transparent" />
+
+              {/* Sticky footer */}
+              <div className="sticky bottom-0 left-0 right-0 z-20 pt-0 pb-4 bg-white flex gap-3">
+                <Button
+                  onClick={() => setStep("upload")}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Back to Upload
+                </Button>
+                <Button onClick={handleSaveDraft} className="flex-1">
+                  Save Draft Project
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
+        </DialogContent>
+
+        {/* Image Preview Modal - Upload Step */}
+        {previewImage && (
+          <ImagePreviewModal
+            isOpen={!!previewImage}
+            onClose={handlePreviewClose}
+            currentImage={{
+              id: previewImage.id,
+              file: previewImage.file,
+              previewUrl: previewImage.previewUrl,
+              uploadUrl: previewImage.uploadUrl,
+              status: "uploaded"
+            }}
+            allImages={images.map((img) => ({
+              id: img.id,
+              file: img.file,
+              previewUrl: img.previewUrl,
+              uploadUrl: img.uploadUrl,
+              status: "uploaded"
+            }))}
+            currentIndex={images.findIndex((img) => img.id === previewImage.id)}
+            onNavigate={(index) => {
+              const newImage = images[index];
+              if (newImage) {
+                setPreviewImage(newImage);
+              }
+            }}
+            categoryInfo={{
+              displayLabel: "Upload",
+              color: "#6b7280"
+            }}
+            showMetadata={false}
+          />
         )}
-      </DialogContent>
 
-      {/* Image Preview Modal - Upload Step */}
-      {previewImage && (
-        <ImagePreviewModal
-          isOpen={!!previewImage}
-          onClose={handlePreviewClose}
-          currentImage={{
-            id: previewImage.id,
-            file: previewImage.file,
-            previewUrl: previewImage.previewUrl,
-            uploadUrl: previewImage.uploadUrl,
-            status: "uploaded"
-          }}
-          allImages={images.map((img) => ({
-            id: img.id,
-            file: img.file,
-            previewUrl: img.previewUrl,
-            uploadUrl: img.uploadUrl,
-            status: "uploaded"
-          }))}
-          currentIndex={images.findIndex((img) => img.id === previewImage.id)}
-          onNavigate={(index) => {
-            const newImage = images[index];
-            if (newImage) {
-              setPreviewImage(newImage);
+        {/* Image Preview Modal - Review Step (Categorized Grid) */}
+        {previewImageFromGrid && (
+          <ImagePreviewModal
+            isOpen={!!previewImageFromGrid}
+            onClose={() => {
+              setPreviewImageFromGrid(null);
+              setInternalIsOpen(true);
+            }}
+            currentImage={previewImageFromGrid}
+            allImages={images}
+            currentIndex={previewIndexFromGrid}
+            onNavigate={(index) => {
+              const newImage = images[index];
+              if (newImage) {
+                setPreviewImageFromGrid(newImage);
+                setPreviewIndexFromGrid(index);
+              }
+            }}
+            categoryInfo={
+              previewImageFromGrid.classification
+                ? {
+                    displayLabel:
+                      categorizedGroups.find((g) =>
+                        g.images.some(
+                          (img) => img.id === previewImageFromGrid.id
+                        )
+                      )?.displayLabel || "Unknown",
+                    color:
+                      categorizedGroups.find((g) =>
+                        g.images.some(
+                          (img) => img.id === previewImageFromGrid.id
+                        )
+                      )?.metadata.color || "#6b7280"
+                  }
+                : undefined
             }
-          }}
-          categoryInfo={{
-            displayLabel: "Upload",
-            color: "#6b7280"
-          }}
-          showMetadata={false}
+            showMetadata={true}
+          />
+        )}
+      </Dialog>
+
+      {/* Template Marketplace Modal - Rendered outside parent Dialog */}
+      {showTemplateMarketplace && savedProjectId && (
+        <TemplateMarketplaceModal
+          isOpen={showTemplateMarketplace}
+          onClose={handleTemplateMarketplaceClose}
+          projectId={savedProjectId}
+          availableCategories={availableCategories}
+          onTemplateSelected={handleTemplateSelected}
         />
       )}
-
-      {/* Image Preview Modal - Review Step (Categorized Grid) */}
-      {previewImageFromGrid && (
-        <ImagePreviewModal
-          isOpen={!!previewImageFromGrid}
-          onClose={() => {
-            setPreviewImageFromGrid(null);
-            setInternalIsOpen(true);
-          }}
-          currentImage={previewImageFromGrid}
-          allImages={images}
-          currentIndex={previewIndexFromGrid}
-          onNavigate={(index) => {
-            const newImage = images[index];
-            if (newImage) {
-              setPreviewImageFromGrid(newImage);
-              setPreviewIndexFromGrid(index);
-            }
-          }}
-          categoryInfo={
-            previewImageFromGrid.classification
-              ? {
-                  displayLabel:
-                    categorizedGroups.find((g) =>
-                      g.images.some((img) => img.id === previewImageFromGrid.id)
-                    )?.displayLabel || "Unknown",
-                  color:
-                    categorizedGroups.find((g) =>
-                      g.images.some((img) => img.id === previewImageFromGrid.id)
-                    )?.metadata.color || "#6b7280"
-                }
-              : undefined
-          }
-          showMetadata={true}
-        />
-      )}
-    </Dialog>
-
-    {/* Template Marketplace Modal - Rendered outside parent Dialog */}
-    {showTemplateMarketplace && savedProjectId && (
-      <TemplateMarketplaceModal
-        isOpen={showTemplateMarketplace}
-        onClose={handleTemplateMarketplaceClose}
-        projectId={savedProjectId}
-        availableCategories={availableCategories}
-        onTemplateSelected={handleTemplateSelected}
-      />
-    )}
     </>
   );
 }

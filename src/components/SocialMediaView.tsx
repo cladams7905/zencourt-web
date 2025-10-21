@@ -1,8 +1,21 @@
-import { Facebook, Instagram, Twitter, Youtube, Check, Video } from "lucide-react";
+import {
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube,
+  Check,
+  Video
+} from "lucide-react";
 import { useState } from "react";
 
 // TikTok icon component
-const TikTokIcon = ({ size = 24, color = "currentColor" }: { size?: number; color?: string }) => (
+const TikTokIcon = ({
+  size = 24,
+  color = "currentColor"
+}: {
+  size?: number;
+  color?: string;
+}) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <path
       d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"
@@ -15,17 +28,59 @@ export function SocialMediaView() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
 
   const platforms = [
-    { id: "tiktok", name: "TikTok", icon: TikTokIcon, color: "#000000", connected: true, format: "vertical" },
-    { id: "instagram", name: "Instagram Reels", icon: Instagram, color: "#E4405F", connected: true, format: "vertical" },
-    { id: "youtube-shorts", name: "YouTube Shorts", icon: Youtube, color: "#FF0000", connected: true, format: "vertical" },
-    { id: "youtube", name: "YouTube", icon: Youtube, color: "#FF0000", connected: true, format: "landscape" },
-    { id: "facebook", name: "Facebook", icon: Facebook, color: "#1877F2", connected: false, format: "both" },
-    { id: "twitter", name: "X (Twitter)", icon: Twitter, color: "#000000", connected: false, format: "both" },
+    {
+      id: "tiktok",
+      name: "TikTok",
+      icon: TikTokIcon,
+      color: "#000000",
+      connected: true,
+      format: "vertical"
+    },
+    {
+      id: "instagram",
+      name: "Instagram Reels",
+      icon: Instagram,
+      color: "#E4405F",
+      connected: true,
+      format: "vertical"
+    },
+    {
+      id: "youtube-shorts",
+      name: "YouTube Shorts",
+      icon: Youtube,
+      color: "#FF0000",
+      connected: true,
+      format: "vertical"
+    },
+    {
+      id: "youtube",
+      name: "YouTube",
+      icon: Youtube,
+      color: "#FF0000",
+      connected: true,
+      format: "landscape"
+    },
+    {
+      id: "facebook",
+      name: "Facebook",
+      icon: Facebook,
+      color: "#1877F2",
+      connected: false,
+      format: "both"
+    },
+    {
+      id: "twitter",
+      name: "X (Twitter)",
+      icon: Twitter,
+      color: "#000000",
+      connected: false,
+      format: "both"
+    }
   ];
 
   const togglePlatform = (id: string) => {
-    setSelectedPlatforms(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    setSelectedPlatforms((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
     );
   };
 
@@ -34,14 +89,15 @@ export function SocialMediaView() {
       <div className="mb-6 sm:mb-8">
         <h2 className="text-2xl sm:text-3xl mb-2">Social Media</h2>
         <p className="text-muted-foreground text-sm sm:text-base">
-          Share your videos across TikTok, YouTube Shorts, Instagram Reels, and more
+          Share your videos across TikTok, YouTube Shorts, Instagram Reels, and
+          more
         </p>
       </div>
 
       {/* Connected Platforms */}
       <div className="mb-6 sm:mb-8">
         <h3 className="mb-4 text-lg sm:text-xl">Connected Platforms</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {platforms.map((platform) => {
             const Icon = platform.icon;
             return (
@@ -108,32 +164,35 @@ export function SocialMediaView() {
 
             <label className="block text-sm mb-3">Select Platforms</label>
             <div className="space-y-2 mb-4">
-              {platforms.filter(p => p.connected).map((platform) => {
-                const Icon = platform.icon;
-                const isSelected = selectedPlatforms.includes(platform.id);
-                return (
-                  <button
-                    key={platform.id}
-                    onClick={() => togglePlatform(platform.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-all ${
-                      isSelected
-                        ? "bg-black text-white border-black"
-                        : "bg-white border-border hover:border-black"
-                    }`}
-                  >
-                    <Icon size={20} color={isSelected ? "white" : platform.color} />
-                    <span>{platform.name}</span>
-                    <span className="text-xs opacity-70 ml-auto mr-2">
-                      {platform.format === "vertical" && "9:16"}
-                      {platform.format === "landscape" && "16:9"}
-                      {platform.format === "both" && "9:16/16:9"}
-                    </span>
-                    {isSelected && (
-                      <Check size={18} />
-                    )}
-                  </button>
-                );
-              })}
+              {platforms
+                .filter((p) => p.connected)
+                .map((platform) => {
+                  const Icon = platform.icon;
+                  const isSelected = selectedPlatforms.includes(platform.id);
+                  return (
+                    <button
+                      key={platform.id}
+                      onClick={() => togglePlatform(platform.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-all ${
+                        isSelected
+                          ? "bg-black text-white border-black"
+                          : "bg-white border-border hover:border-black"
+                      }`}
+                    >
+                      <Icon
+                        size={20}
+                        color={isSelected ? "white" : platform.color}
+                      />
+                      <span>{platform.name}</span>
+                      <span className="text-xs opacity-70 ml-auto mr-2">
+                        {platform.format === "vertical" && "9:16"}
+                        {platform.format === "landscape" && "16:9"}
+                        {platform.format === "both" && "9:16/16:9"}
+                      </span>
+                      {isSelected && <Check size={18} />}
+                    </button>
+                  );
+                })}
             </div>
 
             {/* Auto-optimization notice */}
@@ -178,7 +237,7 @@ export function SocialMediaView() {
               <button className="flex-1 px-4 py-3 border border-black rounded-lg hover:bg-black/5 transition-colors">
                 Schedule
               </button>
-              <button 
+              <button
                 className="flex-1 px-4 py-3 bg-black text-white rounded-lg hover:bg-black/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={selectedPlatforms.length === 0}
               >
@@ -195,20 +254,55 @@ export function SocialMediaView() {
         <div className="bg-white rounded-xl border border-border overflow-hidden">
           <div className="divide-y divide-border">
             {[
-              { video: "Cozy Family Home", platform: "TikTok", format: "9:16", status: "Published", time: "2 hours ago", views: "12.5K" },
-              { video: "3BR Home with Backyard", platform: "Instagram Reels", format: "9:16", status: "Published", time: "1 day ago", views: "8.2K" },
-              { video: "Suburban Ranch House", platform: "YouTube Shorts", format: "9:16", status: "Published", time: "2 days ago", views: "15.8K" },
-              { video: "Move-In Ready Home", platform: "YouTube", format: "16:9", status: "Scheduled", time: "Tomorrow, 10:00 AM", views: "-" },
+              {
+                video: "Cozy Family Home",
+                platform: "TikTok",
+                format: "9:16",
+                status: "Published",
+                time: "2 hours ago",
+                views: "12.5K"
+              },
+              {
+                video: "3BR Home with Backyard",
+                platform: "Instagram Reels",
+                format: "9:16",
+                status: "Published",
+                time: "1 day ago",
+                views: "8.2K"
+              },
+              {
+                video: "Suburban Ranch House",
+                platform: "YouTube Shorts",
+                format: "9:16",
+                status: "Published",
+                time: "2 days ago",
+                views: "15.8K"
+              },
+              {
+                video: "Move-In Ready Home",
+                platform: "YouTube",
+                format: "16:9",
+                status: "Scheduled",
+                time: "Tomorrow, 10:00 AM",
+                views: "-"
+              }
             ].map((post, index) => (
-              <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-secondary/50 transition-colors gap-3">
+              <div
+                key={index}
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-secondary/50 transition-colors gap-3"
+              >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="p-2 bg-secondary rounded-lg flex-shrink-0">
                     <Video size={20} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="mb-1 text-sm sm:text-base truncate">{post.video}</h4>
+                    <h4 className="mb-1 text-sm sm:text-base truncate">
+                      {post.video}
+                    </h4>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-xs sm:text-sm text-muted-foreground">{post.platform}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        {post.platform}
+                      </p>
                       <span className="text-xs text-muted-foreground">•</span>
                       <span className="text-xs px-2 py-0.5 bg-secondary rounded text-muted-foreground">
                         {post.format}
@@ -219,13 +313,23 @@ export function SocialMediaView() {
                 <div className="text-left sm:text-right flex-shrink-0">
                   <div className="text-sm mb-1 flex flex-wrap sm:justify-end items-center gap-2 sm:gap-3">
                     {post.views !== "-" && (
-                      <span className="text-muted-foreground text-xs sm:text-sm">{post.views} views</span>
+                      <span className="text-muted-foreground text-xs sm:text-sm">
+                        {post.views} views
+                      </span>
                     )}
-                    <span className={`text-xs sm:text-sm ${post.status === "Published" ? "text-green-600" : "text-blue-600"}`}>
+                    <span
+                      className={`text-xs sm:text-sm ${
+                        post.status === "Published"
+                          ? "text-green-600"
+                          : "text-blue-600"
+                      }`}
+                    >
                       {post.status}
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">{post.time}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    {post.time}
+                  </p>
                 </div>
               </div>
             ))}

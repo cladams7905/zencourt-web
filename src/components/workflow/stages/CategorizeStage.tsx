@@ -52,14 +52,35 @@ export function CategorizeStage({
       (img.status === "uploaded" || img.status === "analyzed")
   );
   const needsAnalysis = images.filter(
-    (img) => !img.classification && img.status === "uploaded" && !img.error
+    (img) =>
+      !img.classification &&
+      (img.status === "uploaded" || img.status === "analyzed") &&
+      !img.error
   );
 
+  console.log("CategorizeStage state:", {
+    totalImages: images.length,
+    alreadyAnalyzed: alreadyAnalyzed.length,
+    needsAnalysis: needsAnalysis.length,
+    categorizedGroupsLength: categorizedGroups.length,
+    isCategorizing,
+    imageDetails: images.map((img) => ({
+      name: img.file.name.substring(0, 30),
+      status: img.status,
+      hasClassification: !!img.classification,
+      hasUploadUrl: !!img.uploadUrl
+    }))
+  });
+
   // If images need analysis and we haven't started processing, start automatically
+  // Check if the number of analyzed images doesn't match total images needing it
+  const totalImagesThatShouldBeAnalyzed =
+    alreadyAnalyzed.length + needsAnalysis.length;
+  const allImagesAnalyzed =
+    totalImagesThatShouldBeAnalyzed === alreadyAnalyzed.length;
+
   const shouldProcess =
-    needsAnalysis.length > 0 &&
-    !isCategorizing &&
-    categorizedGroups.length === 0;
+    needsAnalysis.length > 0 && !isCategorizing && !allImagesAnalyzed;
 
   const handleProcessImages = useCallback(async () => {
     if (!user || !currentProject) {
@@ -77,6 +98,18 @@ export function CategorizeStage({
       let finalImages: ProcessedImage[];
 
       if (needsAnalysis.length > 0) {
+        // Log to debug upload issues
+        console.log(
+          "Images needing analysis:",
+          needsAnalysis.map((img) => ({
+            id: img.id,
+            name: img.file.name,
+            status: img.status,
+            hasUploadUrl: !!img.uploadUrl,
+            uploadUrl: img.uploadUrl
+          }))
+        );
+
         // Set initial progress state immediately - start with analyzing since images are already uploaded
         setProcessingProgress({
           phase: "analyzing",
@@ -89,8 +122,26 @@ export function CategorizeStage({
           needsAnalysis,
           currentProject.id,
           {
+            userId: user.id,
             onProgress: (progress) => {
-              setProcessingProgress(progress);
+              // Remap progress to use full 0-100% range for analysis
+              // The service uses 50-95% for analysis when images are already uploaded
+              let adjustedProgress = progress.overallProgress;
+              if (progress.phase === "analyzing") {
+                // Map 50-95 to 0-90
+                adjustedProgress = ((progress.overallProgress - 50) / 45) * 90;
+              } else if (progress.phase === "categorizing") {
+                // Map 95 to 90
+                adjustedProgress = 90;
+              } else if (progress.phase === "complete") {
+                // Keep at 95 (we'll finish at 100 after organizing)
+                adjustedProgress = 95;
+              }
+
+              setProcessingProgress({
+                ...progress,
+                overallProgress: Math.max(0, adjustedProgress)
+              });
 
               if (progress.currentImage) {
                 setImages((prev) =>
@@ -110,10 +161,29 @@ export function CategorizeStage({
         finalImages = alreadyAnalyzed;
       }
 
+      // Show organizing/categorizing phase
+      setProcessingProgress({
+        phase: "categorizing",
+        completed: finalImages.length,
+        total: finalImages.length,
+        overallProgress: 95
+      });
+
       setImages(finalImages);
 
       const organized = categorizeAndOrganizeImages(finalImages);
       setCategorizedGroups(organized.groups);
+
+      // Show completion
+      setProcessingProgress({
+        phase: "complete",
+        completed: finalImages.length,
+        total: finalImages.length,
+        overallProgress: 100
+      });
+
+      // Small delay to show 100% completion before transitioning
+      await new Promise((resolve) => setTimeout(resolve, 300));
     } catch (error) {
       console.error("Error processing images:", error);
       toast.error("Failed to process images", {
@@ -252,18 +322,8 @@ export function CategorizeStage({
 
   // Show categorized grid
   return (
-    <div className="h-full flex flex-col overflow-auto">
-      <div className="p-6 space-y-4 flex-1 overflow-auto">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold">Review Categorized Images</h3>
-            <p className="text-sm text-muted-foreground">
-              {categorizedGroups.length} categories found with{" "}
-              {images.filter((img) => img.classification).length} images
-            </p>
-          </div>
-        </div>
-
+    <div className="h-full flex flex-col">
+      <div className="p-6 space-y-4 flex-1">
         <CategorizedImageGrid
           groups={categorizedGroups}
           enablePreview={false}
@@ -278,11 +338,16 @@ export function CategorizeStage({
       {/* Fade overlay and sticky footer */}
       <>
         <div className="sticky pointer-events-none bottom-12 z-20 left-0 right-0 h-12 bg-gradient-to-t from-white via-white to-transparent" />
-        <div className="sticky bottom-0 left-0 right-0 z-20 pt-0 pb-4 px-6 bg-white border-t flex gap-3">
-          <Button onClick={onBack} variant="outline" className="flex-1">
+        <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t flex gap-3">
+          <Button
+            onClick={onBack}
+            variant="outline"
+            size="lg"
+            className="flex-1"
+          >
             Back to Upload
           </Button>
-          <Button onClick={onContinue} className="flex-1">
+          <Button onClick={onContinue} className="flex-1" size="lg">
             Continue to Planning
           </Button>
         </div>

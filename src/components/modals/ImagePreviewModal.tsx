@@ -252,7 +252,7 @@ export function ImagePreviewModal({
                 <h3 className="font-semibold text-lg mb-2">
                   {currentImage.file.name}
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4  gap-3 text-sm">
                   {/* Category */}
                   {categoryInfo && (
                     <div>

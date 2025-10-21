@@ -37,11 +37,6 @@ export function UploadStage({
 
   // Check if we can continue from upload
   const isUploadInitiated = images.length > 0;
-  const canContinueFromUpload =
-    isUploadInitiated &&
-    images.some(
-      (img) => img.status === "uploaded" || img.status === "analyzed"
-    );
   const allUploadedOrError =
     isUploadInitiated &&
     images.every(
@@ -275,62 +270,45 @@ export function UploadStage({
   };
 
   return (
-    <>
-      {/* Header */}
-      <div className="sticky top-0 bg-white z-30 px-6 py-4 border-b">
-        <h2 className="text-xl font-semibold">Choose Images to Upload</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Click to upload or drag and drop images of your property listing to
-          generate content from.
-        </p>
-        {selectedMediaCount > 0 && (
-          <p className="text-sm text-primary font-medium mt-2">
-            {selectedMediaCount} {selectedMediaCount === 1 ? "item" : "items"}{" "}
-            selected
-          </p>
-        )}
+    <div className="flex flex-col">
+      <div className="p-6 space-y-4">
+        <DragDropZone
+          onFilesSelected={handleFilesSelected}
+          maxFiles={50}
+          maxFileSize={10 * 1024 * 1024} // 10MB
+          acceptedFormats={[".jpg", ".jpeg", ".png", ".webp"]}
+          isDisabled={isLoadingPreviews || isUploading}
+          isUploadInitiated={isUploadInitiated}
+        />
+
+        <ImageUploadGrid
+          images={images}
+          onRemove={handleRemoveImage}
+          onRetry={handleRetryUpload}
+          onImageClick={onImageClick}
+        />
       </div>
 
-      <div className="flex flex-col">
-        <div className="p-6 space-y-4">
-          <DragDropZone
-            onFilesSelected={handleFilesSelected}
-            maxFiles={50}
-            maxFileSize={10 * 1024 * 1024} // 10MB
-            acceptedFormats={[".jpg", ".jpeg", ".png", ".webp"]}
-            isDisabled={isLoadingPreviews || isUploading}
-            isUploadInitiated={isUploadInitiated}
-          />
-
-          <ImageUploadGrid
-            images={images}
-            onRemove={handleRemoveImage}
-            onRetry={handleRetryUpload}
-            onImageClick={onImageClick}
-          />
+      {/* Continue Button - Sticky at bottom */}
+      {isUploadInitiated && (
+        <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t">
+          <Button
+            onClick={onContinue}
+            disabled={!allUploadedOrError}
+            className="w-full"
+            size="lg"
+          >
+            {!allUploadedOrError
+              ? "Waiting for uploads to complete..."
+              : `Continue with ${
+                  images.filter(
+                    (img) =>
+                      img.status === "uploaded" || img.status === "analyzed"
+                  ).length
+                } image(s)`}
+          </Button>
         </div>
-
-        {/* Continue Button - Sticky at bottom */}
-        {canContinueFromUpload && (
-          <div className="sticky bottom-0 left-0 right-0 z-20 pt-4 pb-4 px-6 bg-white border-t">
-            <Button
-              onClick={onContinue}
-              disabled={!allUploadedOrError}
-              className="w-full"
-              size="lg"
-            >
-              {!allUploadedOrError
-                ? "Waiting for uploads to complete..."
-                : `Continue with ${
-                    images.filter(
-                      (img) =>
-                        img.status === "uploaded" || img.status === "analyzed"
-                    ).length
-                  } image(s)`}
-            </Button>
-          </div>
-        )}
-      </div>
-    </>
+      )}
+    </div>
   );
 }
