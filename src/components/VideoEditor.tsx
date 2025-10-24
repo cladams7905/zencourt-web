@@ -26,28 +26,28 @@ export function VideoEditor() {
     {
       id: 1,
       name: "Exterior",
-      duration: 8,
+      duration: 5,
       thumbnail:
         "https://images.unsplash.com/photo-1560170412-0f7df0eb0fb1?w=200&q=80"
     },
     {
       id: 2,
       name: "Living Room",
-      duration: 12,
+      duration: 5,
       thumbnail:
         "https://images.unsplash.com/photo-1671966550483-bed07f4c93b4?w=200&q=80"
     },
     {
       id: 3,
       name: "Kitchen",
-      duration: 10,
+      duration: 5,
       thumbnail:
         "https://images.unsplash.com/photo-1546552229-7b16095d6904?w=200&q=80"
     },
     {
       id: 4,
       name: "Bedroom",
-      duration: 8,
+      duration: 5,
       thumbnail:
         "https://images.unsplash.com/photo-1632060503164-790178d036b8?w=200&q=80"
     }

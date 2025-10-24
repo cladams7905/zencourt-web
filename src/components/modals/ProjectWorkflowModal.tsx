@@ -28,7 +28,7 @@ import { GenerateStage } from "@/components/workflow/stages/GenerateStage";
 import { ImagePreviewModal } from "@/components/modals/ImagePreviewModal";
 import { Project } from "@/types/schema";
 import type { ProcessedImage } from "@/types/images";
-import type { CategorizedGroup } from "@/types/roomCategory";
+import type { CategorizedGroup, RoomCategory, RoomClassification } from "@/types/roomCategory";
 import type {
   WorkflowStage,
   GenerationProgress,
@@ -45,12 +45,14 @@ interface ProjectWorkflowModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProjectCreated?: (project: Project) => void;
+  existingProject?: Project | null;
 }
 
 export function ProjectWorkflowModal({
   isOpen,
   onClose,
-  onProjectCreated
+  onProjectCreated,
+  existingProject
 }: ProjectWorkflowModalProps) {
   // Workflow state
   const [currentStage, setCurrentStage] = useState<WorkflowStage>("upload");
@@ -101,6 +103,99 @@ export function ProjectWorkflowModal({
   useEffect(() => {
     setInternalIsOpen(isOpen);
   }, [isOpen]);
+
+  // Load existing project data when modal opens with an existing project
+  useEffect(() => {
+    async function loadExistingProject() {
+      if (!isOpen || !existingProject) return;
+
+      try {
+        // Set project info
+        setCurrentProject(existingProject);
+        setProjectName(existingProject.title || "");
+
+        // Fetch project images
+        const { getProjectImages } = await import("@/db/actions/images");
+        const projectImages = await getProjectImages(existingProject.id);
+
+        // Convert database images to ProcessedImage format
+        const processedImages: ProcessedImage[] = projectImages.map((img) => {
+          const processed: ProcessedImage = {
+            id: img.id,
+            file: new File([], img.filename, { type: "image/*" }), // Mock file for existing images
+            previewUrl: img.url,
+            uploadUrl: img.url,
+            status: "uploaded" as const,
+            url: img.url,
+            filename: img.filename,
+            category: img.category,
+            confidence: img.confidence,
+            features: img.features,
+            order: img.order,
+            metadata: img.metadata,
+            classification: img.category
+              ? ({
+                  category: img.category as RoomCategory,
+                  confidence: img.confidence || 0
+                } as RoomClassification)
+              : undefined
+          };
+          return processed;
+        });
+
+        setImages(processedImages);
+
+        // If images are already categorized, move to categorize stage
+        const categorizedImages = processedImages.filter(
+          (img) => img.classification
+        );
+        if (categorizedImages.length > 0) {
+          // Group images by category
+          const groups = new Map<string, ProcessedImage[]>();
+          categorizedImages.forEach((img) => {
+            const category = img.classification!.category;
+            if (!groups.has(category)) {
+              groups.set(category, []);
+            }
+            groups.get(category)!.push(img);
+          });
+
+          // Convert to CategorizedGroup format
+          const categorizedGroups: CategorizedGroup[] = Array.from(
+            groups.entries()
+          ).map(([category, images], index) => {
+            const avgConfidence = images.reduce((sum, img) =>
+              sum + (img.classification?.confidence || 0), 0) / images.length;
+
+            return {
+              category: category as RoomCategory,
+              displayLabel: category,
+              baseLabel: category,
+              images,
+              avgConfidence,
+              metadata: {
+                id: category as RoomCategory,
+                label: category,
+                color: "#6b7280",
+                icon: "Home",
+                allowNumbering: true,
+                group: "other" as const,
+                order: index
+              }
+            };
+          });
+
+          setCategorizedGroups(categorizedGroups);
+          setCurrentStage("categorize");
+        }
+      } catch (error) {
+        console.error("Failed to load existing project:", error);
+        toast.error("Failed to load project data");
+      }
+    }
+
+    loadExistingProject();
+  }, [isOpen, existingProject]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -288,9 +383,8 @@ export function ProjectWorkflowModal({
             description: "Your content has been successfully generated."
           });
 
-          if (onProjectCreated && currentProject) {
-            onProjectCreated(currentProject);
-          }
+          // Don't call onProjectCreated here - let user view the results first
+          // The modal should stay open to show the video preview
 
           // Cleanup polling
           if (pollingCleanupRef.current) {
@@ -403,6 +497,24 @@ export function ProjectWorkflowModal({
                   </p>
                 </>
               )}
+              {currentStage === "generate" && (
+                <>
+                  <h2 className="text-xl font-semibold">
+                    {generationProgress?.steps?.every((s) => s.status === "completed")
+                      ? "Generation Complete!"
+                      : generationProgress?.steps?.some((s) => s.status === "failed")
+                      ? "Generation Failed"
+                      : "Generating Your Content"}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {generationProgress?.steps?.every((s) => s.status === "completed")
+                      ? "Your content has been successfully generated"
+                      : generationProgress?.steps?.some((s) => s.status === "failed")
+                      ? "Some steps encountered errors"
+                      : "Creating video from your images"}
+                  </p>
+                </>
+              )}
             </div>
             <DialogTitle className="hidden">Project Workflow</DialogTitle>
           </DialogHeader>
@@ -472,7 +584,14 @@ export function ProjectWorkflowModal({
             {currentStage === "generate" && generationProgress && (
               <GenerateStage
                 progress={generationProgress}
+                projectId={currentProject?.id}
                 onCancel={() => {
+                  // Stop polling
+                  if (pollingCleanupRef.current) {
+                    pollingCleanupRef.current();
+                    pollingCleanupRef.current = null;
+                  }
+                  // Reset state
                   setCurrentStage("review");
                   setGenerationProgress(null);
                 }}

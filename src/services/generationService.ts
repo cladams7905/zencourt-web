@@ -36,6 +36,7 @@ interface VideoSettings {
   enableSubtitles: boolean;
   subtitleFont: string;
   aiDirections: string;
+  duration?: "5" | "10";
 }
 
 interface StartGenerationParams {
@@ -78,7 +79,10 @@ export async function startGeneration(
       },
       body: JSON.stringify({
         projectId: params.projectId,
-        videoSettings: params.videoSettings
+        videoSettings: {
+          ...params.videoSettings,
+          duration: params.videoSettings.duration || "5"
+        }
       })
     });
 
@@ -91,7 +95,7 @@ export async function startGeneration(
 
     return {
       success: true,
-      jobIds: data.jobIds,
+      jobIds: [params.projectId], // Use projectId as the single "jobId" for polling
       estimatedCompletionTime: data.estimatedCompletionTime || 120 // 2 minutes default
     };
   } catch (error) {
@@ -106,20 +110,20 @@ export async function startGeneration(
 }
 
 /**
- * Poll generation progress for multiple jobs
+ * Poll generation progress using project ID
  */
 export async function pollGenerationProgress(
   params: PollProgressParams
 ): Promise<PollProgressResponse> {
   try {
-    const response = await fetch("/api/generation/progress", {
-      method: "POST",
+    // Extract projectId from jobIds array (first element is projectId now)
+    const projectId = params.jobIds[0];
+
+    const response = await fetch(`/api/generation/progress?projectId=${projectId}`, {
+      method: "GET",
       headers: {
         "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        jobIds: params.jobIds
-      })
+      }
     });
 
     if (!response.ok) {
@@ -127,51 +131,23 @@ export async function pollGenerationProgress(
     }
 
     const data = await response.json();
-    const jobs: GenerationJob[] = data.jobs;
 
-    // Build generation steps from jobs
-    const steps: GenerationStep[] = jobs.map((job, index) => ({
-      id: job.id,
-      label: `Generating content ${index + 1}`,
-      status: job.status,
-      progress: job.progress,
-      error: job.error
-    }));
+    // The API returns { success, progress, isComplete, hasFailed }
+    // where progress is VideoGenerationProgress
+    const progress: GenerationProgress = {
+      currentStep: data.progress.currentStep,
+      totalSteps: data.progress.totalSteps,
+      currentStepIndex: data.progress.completedSteps,
+      estimatedTimeRemaining: data.progress.estimatedTimeRemaining,
+      overallProgress: data.progress.overallProgress,
+      steps: data.progress.steps
+    };
 
-    // Calculate overall progress
-    const completedSteps = steps.filter((s) => s.status === "completed").length;
-    const inProgressSteps = steps.filter((s) => s.status === "in-progress");
-    const totalProgress = inProgressSteps.reduce(
-      (sum, s) => sum + (s.progress || 0),
-      0
-    );
-    const overallProgress =
-      (completedSteps * 100 + totalProgress) / steps.length;
-
-    // Find current step
-    const currentStepIndex = steps.findIndex((s) => s.status === "in-progress");
-    const currentStep =
-      currentStepIndex >= 0 ? steps[currentStepIndex] : steps[steps.length - 1];
-
-    // Calculate time remaining (rough estimate)
-    const remainingSteps = steps.filter(
-      (s) => s.status === "waiting" || s.status === "in-progress"
-    ).length;
-    const estimatedTimeRemaining = remainingSteps * 60; // Rough estimate
-
-    const isComplete = steps.every((s) => s.status === "completed");
-    const hasFailed = steps.some((s) => s.status === "failed");
+    const isComplete = data.isComplete;
+    const hasFailed = data.hasFailed;
 
     return {
-      progress: {
-        currentStep: currentStep.label,
-        totalSteps: steps.length,
-        currentStepIndex:
-          currentStepIndex >= 0 ? currentStepIndex : steps.length - 1,
-        estimatedTimeRemaining,
-        overallProgress,
-        steps
-      },
+      progress,
       isComplete,
       hasFailed
     };
@@ -228,6 +204,7 @@ export async function getGenerationStatus(
 
 /**
  * Create a polling function that calls a callback with progress updates
+ * Waits 60 seconds before starting to poll, then polls every 15 seconds
  */
 export function createProgressPoller(
   jobIds: string[],
@@ -236,6 +213,7 @@ export function createProgressPoller(
   onError: (error: Error) => void
 ): () => void {
   let intervalId: NodeJS.Timeout | null = null;
+  let initialTimeoutId: NodeJS.Timeout | null = null;
   let isPolling = false;
 
   const poll = async () => {
@@ -260,11 +238,11 @@ export function createProgressPoller(
   };
 
   const startPolling = () => {
-    // Initial poll
-    poll();
+    // Poll every 15 seconds
+    intervalId = setInterval(poll, 15000);
 
-    // Poll every 2 seconds
-    intervalId = setInterval(poll, 2000);
+    // Do an immediate poll when starting
+    poll();
   };
 
   const stopPolling = () => {
@@ -272,10 +250,18 @@ export function createProgressPoller(
       clearInterval(intervalId);
       intervalId = null;
     }
+    if (initialTimeoutId) {
+      clearTimeout(initialTimeoutId);
+      initialTimeoutId = null;
+    }
   };
 
-  // Start polling immediately
-  startPolling();
+  // Wait 60 seconds before starting to poll
+  console.log("[Generation Polling] Waiting 60 seconds before starting to poll progress...");
+  initialTimeoutId = setTimeout(() => {
+    console.log("[Generation Polling] Starting to poll progress every 15 seconds");
+    startPolling();
+  }, 60000);
 
   // Return cleanup function
   return stopPolling;

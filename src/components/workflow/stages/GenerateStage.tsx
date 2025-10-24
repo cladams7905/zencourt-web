@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VerticalTimeline } from "../VerticalTimeline";
@@ -15,58 +15,127 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import type { GenerationProgress } from "@/types/workflow";
-import { Clock } from "lucide-react";
+import { Clock, Download, Play } from "lucide-react";
 
 interface GenerateStageProps {
   progress: GenerationProgress;
+  projectId?: string;
   onCancel?: () => void;
   onRetry?: () => void;
 }
 
 export function GenerateStage({
   progress,
+  projectId,
   onCancel,
   onRetry
 }: GenerateStageProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [videoData, setVideoData] = useState<{
+    videoUrl: string;
+    thumbnailUrl?: string;
+    duration: number;
+  } | null>(null);
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
 
   const isGenerating =
-    progress.steps.some((s) => s.status === "in-progress") ||
-    progress.steps.some((s) => s.status === "waiting");
+    progress.steps?.some((s) => s.status === "in-progress") ||
+    progress.steps?.some((s) => s.status === "waiting") ||
+    false;
 
-  const isComplete = progress.steps.every((s) => s.status === "completed");
+  const isComplete = progress.steps?.every((s) => s.status === "completed") || false;
 
-  const hasFailed = progress.steps.some((s) => s.status === "failed");
+  const hasFailed = progress.steps?.some((s) => s.status === "failed") || false;
+
+  // Fetch video data when generation is complete
+  useEffect(() => {
+    if (!isComplete || !projectId || videoData || isLoadingVideo) {
+      return;
+    }
+
+    // Fetch video with polling every 15 seconds until we get the data
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    const fetchVideo = async () => {
+      if (isLoadingVideo) return;
+
+      setIsLoadingVideo(true);
+      try {
+        const res = await fetch(`/api/generation/video/${projectId}`);
+        const data = await res.json();
+
+        // Check both data.video.videoUrl (API format) and data.videoUrl (fallback)
+        const videoUrl = data.video?.videoUrl || data.videoUrl;
+
+        if (videoUrl) {
+          setVideoData({
+            videoUrl: data.video?.videoUrl || data.videoUrl,
+            thumbnailUrl: data.video?.thumbnailUrl || data.thumbnailUrl,
+            duration: data.video?.duration || data.duration
+          });
+
+          // Stop polling once we have the video
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch video data:", error);
+      } finally {
+        setIsLoadingVideo(false);
+      }
+    };
+
+    // Initial fetch
+    fetchVideo();
+
+    // Poll every 15 seconds
+    pollInterval = setInterval(fetchVideo, 15000);
+
+    // Cleanup on unmount
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [isComplete, projectId]); // Removed videoData and isLoadingVideo from deps to prevent re-triggering
 
   const handleCancelClick = () => {
     setShowCancelDialog(true);
   };
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     setShowCancelDialog(false);
+
+    // Call cancel API endpoint if we have a projectId
+    if (projectId) {
+      try {
+        await fetch(`/api/generation/cancel/${projectId}`, {
+          method: "POST"
+        });
+      } catch (error) {
+        console.error("Failed to cancel generation:", error);
+      }
+    }
+
+    // Call the onCancel callback to stop polling and reset UI
     onCancel?.();
+  };
+
+  const handleDownloadVideo = () => {
+    if (videoData?.videoUrl) {
+      const link = document.createElement("a");
+      link.href = videoData.videoUrl;
+      link.download = `video-${projectId}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-6 py-4 border-b">
-        <h2 className="text-xl font-semibold">
-          {isComplete
-            ? "Generation Complete!"
-            : hasFailed
-            ? "Generation Failed"
-            : "Generating Your Content"}
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {isComplete
-            ? "Your content has been successfully generated"
-            : hasFailed
-            ? "Some steps encountered errors"
-            : "Creating video from your images"}
-        </p>
-      </div>
-
       {/* Content */}
       <ScrollArea className="flex-1">
         <div className="px-6 py-6">
@@ -107,33 +176,75 @@ export function GenerateStage({
 
           {/* Generation Steps Timeline */}
           <div className="max-w-2xl mx-auto">
-            <VerticalTimeline steps={progress.steps} />
+            <VerticalTimeline steps={progress.steps || []} />
           </div>
 
-          {/* Success Message */}
+          {/* Success Message with Video Preview */}
           {isComplete && (
-            <div className="mt-8 p-6 bg-green-50 border border-green-200 rounded-lg text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-green-500 text-white rounded-full flex items-center justify-center">
-                <svg
-                  className="w-8 h-8"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
+            <div className="mt-8 space-y-6">
+              <div className="p-6 bg-green-50 border border-green-200 rounded-lg text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-green-500 text-white rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-8 h-8"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-green-900 mb-2">
+                  All Content Generated!
+                </h3>
+                <p className="text-sm text-green-700">
+                  Your video has been successfully created and is ready to preview and download.
+                </p>
               </div>
-              <h3 className="text-lg font-semibold text-green-900 mb-2">
-                All Content Generated!
-              </h3>
-              <p className="text-sm text-green-700">
-                Your video has been successfully created and is ready to download.
-              </p>
+
+              {/* Video Preview */}
+              {videoData && (
+                <div className="p-6 bg-white border border-gray-200 rounded-lg">
+                  <h4 className="text-md font-semibold mb-4 flex items-center gap-2">
+                    <Play className="w-5 h-5" />
+                    Video Preview
+                  </h4>
+                  <div className="aspect-video bg-black rounded-lg overflow-hidden mb-4">
+                    <video
+                      controls
+                      className="w-full h-full"
+                      poster={videoData.thumbnailUrl}
+                    >
+                      <source src={videoData.videoUrl} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      Duration: {Math.round(videoData.duration)}s
+                    </div>
+                    <Button
+                      onClick={handleDownloadVideo}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Video
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading Video */}
+              {isLoadingVideo && (
+                <div className="p-6 bg-white border border-gray-200 rounded-lg text-center">
+                  <div className="animate-spin w-8 h-8 mx-auto mb-3 border-4 border-primary border-t-transparent rounded-full"></div>
+                  <p className="text-sm text-muted-foreground">Loading video...</p>
+                </div>
+              )}
             </div>
           )}
 

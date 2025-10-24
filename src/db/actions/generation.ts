@@ -1,7 +1,9 @@
 /**
  * Generation Job Database Actions
  *
- * CRUD operations for managing generation jobs
+ * CRUD operations for managing generation jobs in project metadata
+ * Note: This stores jobs temporarily in project metadata. For video-specific
+ * data, use the videos table via /db/actions/videos.ts
  */
 
 "use server";
@@ -252,47 +254,5 @@ export async function deleteGenerationJobs(projectId: string): Promise<void> {
   } catch (error) {
     console.error("Error deleting generation jobs:", error);
     throw new Error("Failed to delete generation jobs");
-  }
-}
-
-/**
- * Simulate generation progress (for development)
- * This would be replaced by actual generation service in production
- */
-export async function simulateGenerationProgress(jobId: string): Promise<void> {
-  try {
-    // Simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Update to in-progress
-    await updateGenerationJobProgress(jobId, {
-      status: "in-progress",
-      progress: 0
-    });
-
-    // Simulate progress updates
-    for (let progress = 10; progress <= 100; progress += 10) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await updateGenerationJobProgress(jobId, {
-        status: "in-progress",
-        progress
-      });
-    }
-
-    // Mark as completed
-    await updateGenerationJobProgress(jobId, {
-      status: "completed",
-      progress: 100,
-      outputUrl: `https://example.com/generated/${jobId}.mp4`,
-      thumbnailUrl: `https://example.com/generated/${jobId}-thumb.jpg`
-    });
-
-    console.log(`Completed simulation for job ${jobId}`);
-  } catch (error) {
-    console.error("Error simulating generation:", error);
-    await updateGenerationJobProgress(jobId, {
-      status: "failed",
-      error: error instanceof Error ? error.message : "Generation failed"
-    });
   }
 }

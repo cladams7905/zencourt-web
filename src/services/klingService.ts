@@ -1,0 +1,357 @@
+/**
+ * Kling API Service
+ *
+ * Handles all interactions with the Kling AI video generation API via fal.ai
+ */
+
+import * as fal from "@fal-ai/serverless-client";
+import type {
+  KlingApiRequest,
+  KlingApiResponse,
+  RoomVideoRequest,
+  KlingServiceConfig,
+  VideoGenerationError,
+  ImageSelectionResult,
+  PromptBuilderContext
+} from "@/types/video-generation";
+import type { ProcessedImage } from "@/types/images";
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+const DEFAULT_CONFIG: KlingServiceConfig = {
+  apiKey: process.env.FAL_KEY || "",
+  maxRetries: 3,
+  timeoutMs: 60000, // 60 seconds
+  concurrentRequests: 3
+};
+
+// Configure fal.ai client
+if (DEFAULT_CONFIG.apiKey) {
+  fal.config({
+    credentials: DEFAULT_CONFIG.apiKey
+  });
+}
+
+// ============================================================================
+// Main API Functions
+// ============================================================================
+
+/**
+ * Submit video generation request for a single room (non-blocking)
+ */
+export async function submitRoomVideoGeneration(
+  roomData: RoomVideoRequest
+): Promise<string> {
+  try {
+    // Validate API key
+    if (!DEFAULT_CONFIG.apiKey) {
+      throw createError(
+        "FAL_KEY environment variable is not set",
+        "KLING_API_ERROR"
+      );
+    }
+
+    // Select best images (up to 4 for elements endpoint)
+    const selectedImages = selectBestImages(roomData.images, 4);
+
+    if (selectedImages.length === 0) {
+      throw createError(
+        `No images available for room: ${roomData.roomName}`,
+        "VALIDATION_ERROR"
+      );
+    }
+
+    // Build prompt for this room
+    const prompt = buildKlingPrompt({
+      roomName: roomData.roomName,
+      roomType: roomData.roomType,
+      aiDirections: roomData.settings.aiDirections,
+      imageCount: selectedImages.length
+    });
+
+    // Construct Kling API request for v1.6/standard/elements
+    const request: KlingApiRequest = {
+      prompt,
+      input_image_urls: selectedImages,
+      duration: roomData.settings.duration,
+      aspect_ratio: roomData.settings.aspectRatio
+      // No negative_prompt for maximum adherence to input images
+    };
+
+    console.log(
+      `[Kling API] Submitting video generation for room: ${roomData.roomName} with ${selectedImages.length} images`
+    );
+
+    // Submit to queue (non-blocking)
+    const { request_id } = await fal.queue.submit(
+      "fal-ai/kling-video/v1.6/standard/elements",
+      { input: request }
+    );
+
+    console.log(
+      `[Kling API] Submitted request for room ${roomData.roomName}, requestId: ${request_id}`
+    );
+
+    return request_id;
+  } catch (error) {
+    console.error(
+      `[Kling API] Error submitting video generation for room ${roomData.roomName}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Poll the status of a video generation request
+ */
+export async function pollRoomVideoStatus(
+  requestId: string
+): Promise<{ status: string; completed: boolean }> {
+  try {
+    const status = await fal.queue.status(
+      "fal-ai/kling-video/v1.6/standard/elements",
+      { requestId, logs: true }
+    );
+
+    return {
+      status: status.status,
+      completed: status.status === "COMPLETED"
+    };
+  } catch (error) {
+    console.error(
+      `[Kling API] Error polling status for request ${requestId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Get the result of a completed video generation request
+ */
+export async function getRoomVideoResult(
+  requestId: string
+): Promise<KlingApiResponse> {
+  try {
+    const result = (await fal.queue.result(
+      "fal-ai/kling-video/v1.6/standard/elements",
+      { requestId }
+    )) as { data?: KlingApiResponse } | KlingApiResponse;
+
+    console.log(
+      `[Kling API] Retrieved result for request ${requestId}:`,
+      JSON.stringify(result, null, 2)
+    );
+
+    // Handle both possible response structures:
+    // 2. { video: { url, ... } } (direct)
+    let responseData: KlingApiResponse;
+
+    if ("video" in result) {
+      // Direct response
+      responseData = result as KlingApiResponse;
+    } else {
+      throw createError(
+        "Invalid response from Kling API: missing video data",
+        "KLING_API_ERROR",
+        result
+      );
+    }
+
+    if (!responseData.video) {
+      throw createError(
+        "Invalid response from Kling API: missing video property",
+        "KLING_API_ERROR",
+        result
+      );
+    }
+
+    if (!responseData.video.url) {
+      throw createError(
+        "Invalid response from Kling API: missing video URL",
+        "KLING_API_ERROR",
+        result
+      );
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error(
+      `[Kling API] Error getting result for request ${requestId}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+// ============================================================================
+// Image Selection Functions
+// ============================================================================
+
+/**
+ * Select the best images for video generation (up to maxCount)
+ * Prioritizes images with higher confidence scores
+ */
+export function selectBestImages(
+  imageUrls: string[],
+  maxCount: number = 4
+): string[] {
+  if (imageUrls.length === 0) {
+    return [];
+  }
+
+  // If we have fewer images than maxCount, return all
+  if (imageUrls.length <= maxCount) {
+    return imageUrls;
+  }
+
+  // Otherwise, take the first maxCount images
+  // (assumes images are already ordered by confidence or user preference)
+  return imageUrls.slice(0, maxCount);
+}
+
+/**
+ * Select best images from ProcessedImage array
+ */
+export function selectBestImagesFromProcessed(
+  images: ProcessedImage[],
+  maxCount: number = 4
+): ImageSelectionResult {
+  if (images.length === 0) {
+    return {
+      selectedUrls: [],
+      totalImages: 0,
+      confidenceScores: []
+    };
+  }
+
+  // Filter out images without upload URLs
+  const uploadedImages = images.filter((img) => img.uploadUrl);
+
+  if (uploadedImages.length === 0) {
+    return {
+      selectedUrls: [],
+      totalImages: images.length,
+      confidenceScores: []
+    };
+  }
+
+  // Sort by confidence score (descending)
+  const sortedImages = [...uploadedImages].sort((a, b) => {
+    const confidenceA = a.classification?.confidence || 0;
+    const confidenceB = b.classification?.confidence || 0;
+    return confidenceB - confidenceA;
+  });
+
+  // Take top maxCount images
+  const selectedImages = sortedImages.slice(0, maxCount);
+
+  return {
+    selectedUrls: selectedImages.map((img) => img.uploadUrl!),
+    totalImages: images.length,
+    confidenceScores: selectedImages.map(
+      (img) => img.classification?.confidence || 0
+    )
+  };
+}
+
+// ============================================================================
+// Prompt Building Functions
+// ============================================================================
+
+/**
+ * Build a minimal, directive prompt for strict adherence to input images
+ */
+export function buildKlingPrompt(context: PromptBuilderContext): string {
+  const { roomType, aiDirections } = context;
+
+  // Minimal prompt - less description = more adherence to images
+  let prompt = `Smooth camera pan through ${roomType.toLowerCase()}. Camera should move very slowly through the space. Pay special attention to the dimensions and layout of the space and stick exactly to which features are in the input images.`;
+
+  // Add AI directions if provided (user's specific instructions)
+  if (aiDirections && aiDirections.trim().length > 0) {
+    prompt += `. ${aiDirections.trim()}`;
+  }
+
+  // Ensure prompt doesn't exceed max length (2500 chars)
+  if (prompt.length > 2500) {
+    prompt = prompt.substring(0, 2497) + "...";
+  }
+
+  return prompt;
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Execute a function with retry logic
+ */
+async function executeWithRetry<T>(
+  operation: () => Promise<T>,
+  options: {
+    maxRetries: number;
+    backoff: "exponential" | "linear";
+    onRetry?: (attempt: number, error: Error) => void;
+  }
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= options.maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+
+      // Don't retry on certain error types
+      if (
+        lastError.message.includes("VALIDATION_ERROR") ||
+        lastError.message.includes("Invalid")
+      ) {
+        throw lastError;
+      }
+
+      if (attempt < options.maxRetries) {
+        const delay =
+          options.backoff === "exponential"
+            ? Math.min(1000 * Math.pow(2, attempt), 30000)
+            : 1000 * (attempt + 1);
+
+        // For rate limiting, wait longer
+        const finalDelay = lastError.message.includes("KLING_RATE_LIMIT")
+          ? Math.max(delay, 10000)
+          : delay;
+
+        options.onRetry?.(attempt + 1, lastError);
+        await new Promise((resolve) => setTimeout(resolve, finalDelay));
+      }
+    }
+  }
+
+  throw lastError!;
+}
+
+/**
+ * Create a VideoGenerationError with proper typing
+ */
+function createError(
+  message: string,
+  code: VideoGenerationError["code"],
+  details?: unknown
+): VideoGenerationError {
+  const error = new Error(message) as VideoGenerationError;
+  error.code = code;
+  error.details = details;
+  error.name = "VideoGenerationError";
+  return error;
+}
+
+// ============================================================================
+// Export Configuration
+// ============================================================================
+
+export const klingConfig = DEFAULT_CONFIG;

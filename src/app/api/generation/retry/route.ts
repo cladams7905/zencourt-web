@@ -1,8 +1,8 @@
 /**
- * API Route: Start Generation
+ * API Route: Retry Failed Rooms
  *
- * POST /api/generation/start
- * Starts the video generation process using Kling API
+ * POST /api/generation/retry
+ * Retries video generation for specific failed rooms
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,19 +11,20 @@ import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import {
-  startVideoGeneration,
+  retryFailedRoomVideos,
   type VideoSettings
 } from "@/services/videoGenerationOrchestrator";
 
-// Allow longer execution time for video generation
+// Allow longer execution time for retries
 export const maxDuration = 300; // 5 minutes
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface StartGenerationRequest {
+interface RetryRequest {
   projectId: string;
+  roomIds: string[];
   videoSettings: VideoSettings;
 }
 
@@ -43,8 +44,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse request body
-    const body: StartGenerationRequest = await request.json();
-    const { projectId, videoSettings } = body;
+    const body: RetryRequest = await request.json();
+    const { projectId, roomIds, videoSettings } = body;
 
     // Validate request
     if (!projectId) {
@@ -54,32 +55,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!roomIds || roomIds.length === 0) {
+      return NextResponse.json(
+        {
+          error: "Invalid request",
+          message: "At least one room ID is required"
+        },
+        { status: 400 }
+      );
+    }
+
     if (!videoSettings) {
       return NextResponse.json(
         {
           error: "Invalid request",
           message: "Video settings are required"
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate video settings
-    if (!videoSettings.duration || !["5", "10"].includes(videoSettings.duration)) {
-      return NextResponse.json(
-        {
-          error: "Invalid request",
-          message: "Duration must be 5 or 10 seconds"
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!videoSettings.roomOrder || videoSettings.roomOrder.length === 0) {
-      return NextResponse.json(
-        {
-          error: "Invalid request",
-          message: "At least one room is required"
         },
         { status: 400 }
       );
@@ -107,44 +97,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update project status to processing
-    await db
-      .update(projects)
-      .set({
-        videoGenerationStatus: "processing",
-        updatedAt: new Date()
-      })
-      .where(eq(projects.id, projectId));
-
     console.log(
-      `[API] Starting video generation for project ${projectId} with ${videoSettings.roomOrder.length} rooms`
+      `[API] Retrying ${roomIds.length} failed rooms for project ${projectId}`
     );
 
-    // Start video generation in background (don't await - let it run async)
-    // The client will poll for progress
-    startVideoGeneration(projectId, user.id, videoSettings).catch((error) => {
-      console.error(`[API] Video generation failed for project ${projectId}:`, error);
-    });
-
-    // Calculate estimated completion time
-    // 60 seconds per room + 90 seconds for composition
-    const estimatedTime = videoSettings.roomOrder.length * 60 + 90;
+    // Retry failed rooms in background
+    retryFailedRoomVideos(projectId, user.id, roomIds, videoSettings).catch(
+      (error) => {
+        console.error(`[API] Retry failed for project ${projectId}:`, error);
+      }
+    );
 
     return NextResponse.json({
       success: true,
-      projectId,
-      estimatedCompletionTime: estimatedTime,
-      message: "Video generation started successfully"
+      message: `Retrying ${roomIds.length} room(s)`
     });
   } catch (error) {
-    console.error("[API] Error starting generation:", error);
+    console.error("[API] Error retrying generation:", error);
     return NextResponse.json(
       {
         error: "Internal server error",
         message:
           error instanceof Error
             ? error.message
-            : "Failed to start generation. Please try again."
+            : "Failed to retry generation"
       },
       { status: 500 }
     );

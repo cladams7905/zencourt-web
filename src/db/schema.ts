@@ -10,7 +10,8 @@ import {
   timestamp,
   jsonb,
   integer,
-  varchar
+  varchar,
+  index
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { authenticatedRole, authUid, crudPolicy } from "drizzle-orm/neon";
@@ -38,6 +39,10 @@ export const projects = pgTable(
     duration: integer("duration"), // in seconds
     subtitles: jsonb("subtitles").$type<boolean>().default(false),
     metadata: jsonb("metadata").$type<ProjectMetadata>(), // Additional project metadata
+    // Video generation fields
+    videoGenerationStatus: varchar("video_generation_status", { length: 50 }), // idle, processing, completed, failed
+    finalVideoUrl: text("final_video_url"),
+    finalVideoDuration: integer("final_video_duration"), // in seconds
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()
   },
@@ -73,6 +78,42 @@ export const images = pgTable(
   },
   (table) => [
     // RLS Policy: Users can only access images from their own projects
+    crudPolicy({
+      role: authenticatedRole,
+      read: sql`(select ${projects.userId} = auth.user_id() from ${projects} where ${projects.id} = ${table.projectId})`,
+      modify: sql`(select ${projects.userId} = auth.user_id() from ${projects} where ${projects.id} = ${table.projectId})`
+    })
+  ]
+);
+
+/**
+ * Videos table
+ * Stores generated videos for projects (room videos and final combined video)
+ */
+export const videos = pgTable(
+  "videos",
+  {
+    id: text("id").primaryKey(), // UUID or custom ID
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    roomId: text("room_id"), // NULL for final combined video
+    roomName: text("room_name"),
+    videoUrl: text("video_url").notNull(), // Vercel Blob URL
+    thumbnailUrl: text("thumbnail_url"),
+    duration: integer("duration").notNull(), // in seconds
+    status: varchar("status", { length: 50 }).notNull(), // pending, processing, completed, failed
+    generationSettings: jsonb("generation_settings"), // Store Kling API request params
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull()
+  },
+  (table) => [
+    // Indexes for performance
+    index("videos_project_id_idx").on(table.projectId),
+    index("videos_room_id_idx").on(table.roomId),
+    index("videos_status_idx").on(table.status),
+    // RLS Policy: Users can only access videos from their own projects
     crudPolicy({
       role: authenticatedRole,
       read: sql`(select ${projects.userId} = auth.user_id() from ${projects} where ${projects.id} = ${table.projectId})`,

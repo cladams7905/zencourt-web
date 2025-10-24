@@ -24,21 +24,42 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
   const [filter, setFilter] = useState<"all" | "vertical" | "landscape">("all");
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const handleCreateProject = () => {
+    setSelectedProject(null);
+    setIsWorkflowModalOpen(true);
+  };
+
+  const handleOpenProject = (project: Project) => {
+    setSelectedProject(project);
     setIsWorkflowModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsWorkflowModalOpen(false);
+    setSelectedProject(null);
   };
 
   const handleProjectCreated = (project: Project) => {
-    setProjects([...projects, project]);
+    // Check if project already exists and update it, otherwise add it
+    const existingIndex = projects.findIndex(p => p.id === project.id);
+    if (existingIndex >= 0) {
+      // Update existing project
+      const updatedProjects = [...projects];
+      updatedProjects[existingIndex] = project;
+      setProjects(updatedProjects);
+    } else {
+      // Add new project
+      setProjects([...projects, project]);
+    }
     setIsWorkflowModalOpen(false);
+    setSelectedProject(null);
   };
 
-  const filteredProjects = projects.filter((project) => {
+  // Remove duplicates and apply filter
+  const uniqueProjects = Array.from(new Map(projects.map(p => [p.id, p])).values());
+  const filteredProjects = uniqueProjects.filter((project) => {
     if (filter === "all") return true;
     return project.format === filter;
   });
@@ -52,6 +73,7 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
           isOpen={isWorkflowModalOpen}
           onClose={handleCloseModal}
           onProjectCreated={handleProjectCreated}
+          existingProject={selectedProject}
         />
       </div>
     );
@@ -154,9 +176,8 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
             {filteredProjects.map((project) => (
               <div
                 key={project.id}
-                className={`bg-white rounded-xl overflow-hidden border border-border hover:shadow-lg transition-shadow group ${
-                  project.status === "draft" ? "cursor-pointer" : ""
-                }`}
+                onClick={() => handleOpenProject(project)}
+                className="bg-white rounded-xl overflow-hidden border border-border hover:shadow-lg transition-shadow group cursor-pointer"
               >
                 <div className="relative aspect-video bg-gradient-to-br from-[#d4c4b0] to-[#e8ddd3] overflow-hidden">
                   {project.format === "vertical" ? (
@@ -228,6 +249,7 @@ export function ProjectsView({ initialProjects }: ProjectsViewProps) {
         isOpen={isWorkflowModalOpen}
         onClose={handleCloseModal}
         onProjectCreated={handleProjectCreated}
+        existingProject={selectedProject}
       />
     </div>
   );

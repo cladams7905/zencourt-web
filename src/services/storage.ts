@@ -1,10 +1,13 @@
 /**
  * Storage Service
  *
- * Handles file uploads via API routes to Vercel Blob Storage.
+ * Handles file uploads via API routes or directly to Vercel Blob Storage.
+ * Includes support for images and videos.
  */
 
 import { UploadResult } from "@/types/images";
+import type { VideoStorageConfig } from "@/types/video-generation";
+import { put } from "@vercel/blob";
 
 export interface StorageService {
   uploadFile(file: File, folder: string): Promise<string>;
@@ -13,18 +16,61 @@ export interface StorageService {
 }
 
 /**
- * Upload a single file to storage via API route
+ * Get the base URL for server-side API calls
+ */
+function getBaseUrl(): string {
+  // For server-side rendering, we need an absolute URL
+  if (typeof window === "undefined") {
+    // Check for Vercel deployment URL
+    if (process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}`;
+    }
+    // Check for custom domain
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+      return process.env.NEXT_PUBLIC_APP_URL;
+    }
+    // Fallback to localhost for development
+    return "http://localhost:3000";
+  }
+  // Client-side can use relative URLs
+  return "";
+}
+
+/**
+ * Upload a single file to storage
+ * Uses Vercel Blob directly on server-side, API route on client-side
  * @param file - File to upload
  * @param folder - Folder path for organization (e.g., "projects/abc123")
  * @returns Public URL of the uploaded file
  */
 export async function uploadFile(file: File, folder: string): Promise<string> {
   try {
+    // Server-side: Use Vercel Blob directly to avoid middleware auth issues
+    if (typeof window === "undefined") {
+      const token = process.env.BLOB_READ_WRITE_TOKEN;
+
+      if (!token) {
+        throw new Error("BLOB_READ_WRITE_TOKEN not configured");
+      }
+
+      const blob = await put(`${folder}/${file.name}`, file, {
+        access: "public",
+        token,
+        addRandomSuffix: true
+      });
+
+      return blob.url;
+    }
+
+    // Client-side: Use API route
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", folder);
 
-    const response = await fetch("/api/blob", {
+    const baseUrl = getBaseUrl();
+    const url = `${baseUrl}/api/blob`;
+
+    const response = await fetch(url, {
       method: "PUT",
       body: formData
     });
@@ -83,7 +129,10 @@ export async function uploadFiles(
  */
 export async function deleteFile(url: string): Promise<void> {
   try {
-    const response = await fetch("/api/blob", {
+    const baseUrl = getBaseUrl();
+    const apiUrl = `${baseUrl}/api/blob`;
+
+    const response = await fetch(apiUrl, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json"
@@ -140,3 +189,208 @@ export const storageService: StorageService = {
   uploadFiles,
   deleteFile
 };
+
+// ============================================================================
+// Video Storage Functions
+// ============================================================================
+
+/**
+ * Get the folder path for room videos
+ * Uses format: user_{userId}/videos/video_{videoId}
+ */
+export function getRoomVideoFolder(config: VideoStorageConfig): string {
+  const { userId, videoId } = config;
+  if (!userId || !videoId) {
+    throw new Error("User ID and Video ID are required for video storage");
+  }
+  return `user_${userId}/videos/${videoId}`;
+}
+
+/**
+ * Get the folder path for final combined video
+ * Uses format: user_{userId}/videos/video_{videoId}
+ */
+export function getFinalVideoFolder(userId: string, videoId: string): string {
+  if (!userId || !videoId) {
+    throw new Error("User ID and Video ID are required for video storage");
+  }
+  return `user_${userId}/videos/${videoId}`;
+}
+
+/**
+ * Get the folder path for temporary video files during composition
+ */
+export function getTempVideoFolder(userId: string, videoId: string): string {
+  if (!userId || !videoId) {
+    throw new Error("User ID and Video ID are required for temp storage");
+  }
+  return `user_${userId}/videos/${videoId}/temp`;
+}
+
+/**
+ * Upload a room video to storage
+ */
+export async function uploadRoomVideo(
+  videoBlob: Blob,
+  config: VideoStorageConfig,
+  roomName: string
+): Promise<string> {
+  try {
+    const folder = getRoomVideoFolder(config);
+    const filename = `${sanitizeFilename(roomName)}_${Date.now()}.mp4`;
+    const file = new File([videoBlob], filename, { type: "video/mp4" });
+
+    return await uploadFile(file, folder);
+  } catch (error) {
+    console.error("Error uploading room video:", error);
+    throw new Error(
+      `Failed to upload room video: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+/**
+ * Upload the final combined video to storage
+ */
+export async function uploadFinalVideo(
+  videoBlob: Blob,
+  userId: string,
+  videoId: string,
+  projectName?: string
+): Promise<string> {
+  try {
+    const folder = getFinalVideoFolder(userId, videoId);
+    const filename = projectName
+      ? `${sanitizeFilename(projectName)}_final_${Date.now()}.mp4`
+      : `final_video_${Date.now()}.mp4`;
+    const file = new File([videoBlob], filename, { type: "video/mp4" });
+
+    return await uploadFile(file, folder);
+  } catch (error) {
+    console.error("Error uploading final video:", error);
+    throw new Error(
+      `Failed to upload final video: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+/**
+ * Upload a thumbnail image to storage
+ */
+export async function uploadThumbnail(
+  thumbnailBlob: Blob,
+  userId: string,
+  videoId: string
+): Promise<string> {
+  try {
+    const folder = getFinalVideoFolder(userId, videoId);
+    const filename = `final_thumb_${Date.now()}.jpg`;
+    const file = new File([thumbnailBlob], filename, { type: "image/jpeg" });
+
+    return await uploadFile(file, folder);
+  } catch (error) {
+    console.error("Error uploading thumbnail:", error);
+    throw new Error(
+      `Failed to upload thumbnail: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+/**
+ * Download a video from a URL (e.g., from Kling API response)
+ */
+export async function downloadVideoFromUrl(url: string): Promise<Blob> {
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to download video: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+
+    if (blob.size === 0) {
+      throw new Error("Downloaded video is empty");
+    }
+
+    return blob;
+  } catch (error) {
+    console.error("Error downloading video:", error);
+    throw new Error(
+      `Failed to download video from URL: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+}
+
+/**
+ * Execute storage operation with retry logic
+ */
+export async function executeStorageWithRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+        console.log(
+          `Storage operation failed, retrying in ${delay}ms (attempt ${
+            attempt + 1
+          }/${maxRetries})`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError!;
+}
+
+/**
+ * Clean up temporary video files
+ */
+export async function cleanupTempVideos(
+  userId: string,
+  projectId: string,
+  tempUrls: string[]
+): Promise<void> {
+  try {
+    const deletePromises = tempUrls.map((url) =>
+      deleteFile(url).catch((error) => {
+        console.warn(`Failed to delete temp file ${url}:`, error);
+        // Don't throw - cleanup is best-effort
+      })
+    );
+
+    await Promise.all(deletePromises);
+    console.log(`Cleaned up ${tempUrls.length} temporary video files`);
+  } catch (error) {
+    console.warn("Error during temp file cleanup:", error);
+    // Don't throw - cleanup is best-effort
+  }
+}
+
+/**
+ * Sanitize filename for storage
+ */
+function sanitizeFilename(filename: string): string {
+  return filename
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
