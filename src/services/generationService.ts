@@ -119,12 +119,15 @@ export async function pollGenerationProgress(
     // Extract projectId from jobIds array (first element is projectId now)
     const projectId = params.jobIds[0];
 
-    const response = await fetch(`/api/generation/progress?projectId=${projectId}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json"
+    const response = await fetch(
+      `/api/generation/progress?projectId=${projectId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        }
       }
-    });
+    );
 
     if (!response.ok) {
       throw new Error("Failed to fetch generation progress");
@@ -204,7 +207,7 @@ export async function getGenerationStatus(
 
 /**
  * Create a polling function that calls a callback with progress updates
- * Waits 60 seconds before starting to poll, then polls every 15 seconds
+ * Waits 60 seconds before starting to poll, then polls every 5 seconds
  */
 export function createProgressPoller(
   jobIds: string[],
@@ -238,8 +241,8 @@ export function createProgressPoller(
   };
 
   const startPolling = () => {
-    // Poll every 15 seconds
-    intervalId = setInterval(poll, 15000);
+    // Poll every 5 seconds
+    intervalId = setInterval(poll, 5000);
 
     // Do an immediate poll when starting
     poll();
@@ -257,9 +260,13 @@ export function createProgressPoller(
   };
 
   // Wait 60 seconds before starting to poll
-  console.log("[Generation Polling] Waiting 60 seconds before starting to poll progress...");
+  console.log(
+    "[Generation Polling] Waiting 60 seconds before starting to poll progress..."
+  );
   initialTimeoutId = setTimeout(() => {
-    console.log("[Generation Polling] Starting to poll progress every 15 seconds");
+    console.log(
+      "[Generation Polling] Starting to poll progress every 5 seconds"
+    );
     startPolling();
   }, 60000);
 

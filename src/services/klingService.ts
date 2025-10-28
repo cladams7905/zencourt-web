@@ -68,7 +68,8 @@ export async function submitRoomVideoGeneration(
       roomName: roomData.roomName,
       roomType: roomData.roomType,
       aiDirections: roomData.settings.aiDirections,
-      imageCount: selectedImages.length
+      imageCount: selectedImages.length,
+      sceneDescriptions: roomData.sceneDescriptions
     });
 
     // Construct Kling API request for v1.6/standard/elements
@@ -263,23 +264,41 @@ export function selectBestImagesFromProcessed(
 // ============================================================================
 
 /**
- * Build a minimal, directive prompt for strict adherence to input images
+ * Build a detailed prompt incorporating scene descriptions from OpenAI vision
  */
 export function buildKlingPrompt(context: PromptBuilderContext): string {
-  const { roomType, aiDirections } = context;
+  const { roomType, aiDirections, sceneDescriptions } = context;
 
-  // Minimal prompt - less description = more adherence to images
-  let prompt = `Smooth camera pan through ${roomType.toLowerCase()}. Camera should move very slowly through the space. Pay special attention to the dimensions and layout of the space and stick exactly to which features are in the input images.`;
+  // Start with base camera movement instruction
+  let prompt = `Smooth camera pan through ${roomType.toLowerCase()}. Camera should move very slowly through the space.`;
+
+  // Add detailed scene descriptions if available
+  if (sceneDescriptions && sceneDescriptions.length > 0) {
+    // Combine scene descriptions into a comprehensive description
+    const detailedDescription = sceneDescriptions
+      .filter(desc => desc && desc.trim().length > 0)
+      .join(' ');
+
+    if (detailedDescription) {
+      prompt += ` ${detailedDescription}`;
+    }
+  } else {
+    // Fallback to minimal prompt if no scene descriptions
+    prompt += ` Pay special attention to the dimensions and layout of the space and stick exactly to which features are in the input images.`;
+  }
 
   // Add AI directions if provided (user's specific instructions)
   if (aiDirections && aiDirections.trim().length > 0) {
-    prompt += `. ${aiDirections.trim()}`;
+    prompt += ` ${aiDirections.trim()}`;
   }
 
   // Ensure prompt doesn't exceed max length (2500 chars)
   if (prompt.length > 2500) {
+    console.warn(`[Kling Prompt] Prompt exceeded 2500 chars (${prompt.length}), truncating...`);
     prompt = prompt.substring(0, 2497) + "...";
   }
+
+  console.log(`[Kling Prompt] Generated prompt (${prompt.length} chars):`, prompt);
 
   return prompt;
 }

@@ -72,6 +72,7 @@ export const images = pgTable(
     category: varchar("category", { length: 50 }), // room classification
     confidence: integer("confidence"), // AI confidence score (0-100)
     features: jsonb("features").$type<string[]>(), // Detected features
+    sceneDescription: text("scene_description"), // Detailed scene description for video generation
     order: integer("order"), // Display order in video
     metadata: jsonb("metadata").$type<ImageMetadata>(), // Additional image metadata
     uploadedAt: timestamp("uploaded_at").defaultNow().notNull()

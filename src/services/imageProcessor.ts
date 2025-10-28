@@ -13,6 +13,7 @@
 
 import { uploadFiles, getProjectFolder } from "./storage";
 import { classifyRoomBatch } from "./aiVision";
+import { generateSceneDescription } from "@/db/actions/ai";
 import type {
   ProcessedImage,
   ProcessingPhase,
@@ -327,7 +328,55 @@ async function analyzeImages(
     }
   });
 
-  return images;
+  // Generate scene descriptions for successfully classified images
+  // This provides detailed descriptions for video generation with Kling AI
+  console.log('[Image Processor] Generating scene descriptions for video generation');
+  const classifiedImages = uploadedImages.filter(img => img.classification);
+  console.log(`[Image Processor] Found ${classifiedImages.length} classified images to generate scene descriptions for`);
+
+  for (const image of classifiedImages) {
+    try {
+      const roomType = image.classification!.category.replace(/-/g, ' ');
+      console.log(`[Image Processor] Generating scene description for ${image.id} (${roomType})...`);
+      console.log(`[Image Processor] Image URL:`, image.uploadUrl);
+
+      const sceneDesc = await generateSceneDescription(
+        image.uploadUrl!,
+        roomType,
+        { timeout: 30000, maxRetries: 2 }
+      );
+
+      console.log(`[Image Processor] Scene description API response:`, sceneDesc);
+
+      if (!sceneDesc || !sceneDesc.description) {
+        console.error(`[Image Processor] ✗ Scene description is empty or invalid for ${image.id}`);
+        continue;
+      }
+
+      image.sceneDescription = sceneDesc.description;
+      console.log(`[Image Processor] ✓ Generated scene description for ${roomType} (${sceneDesc.description.length} chars):`, sceneDesc.description.substring(0, 100) + '...');
+      console.log(`[Image Processor] ✓ Image ${image.id} now has sceneDescription:`, !!image.sceneDescription);
+    } catch (error) {
+      console.error(`[Image Processor] ✗ Failed to generate scene description for image ${image.id}:`, error);
+      console.error(`[Image Processor] Error details:`, {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      // Don't fail the entire process if scene description fails
+      // The classification is still valid
+    }
+  }
+
+  console.log('[Image Processor] Scene description summary:',
+    uploadedImages.map(img => ({
+      id: img.id,
+      hasSceneDesc: !!img.sceneDescription,
+      descLength: img.sceneDescription?.length || 0
+    }))
+  );
+
+  return uploadedImages;
 }
 
 /**

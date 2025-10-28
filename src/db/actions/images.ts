@@ -33,6 +33,7 @@ export async function saveImages(
       ? Math.round(img.classification.confidence * 100)
       : null,
     features: img.classification?.features || null,
+    sceneDescription: img.sceneDescription || null,
     order: index,
     metadata: {
       width: img.metadata?.width || 0,
@@ -42,6 +43,16 @@ export async function saveImages(
       lastModified: img.metadata?.lastModified || 0
     }
   }));
+
+  // Debug: Log scene descriptions being saved
+  console.log('[DB Actions] Saving images with scene descriptions:',
+    imageRecords.map(img => ({
+      id: img.id,
+      category: img.category,
+      hasSceneDesc: !!img.sceneDescription,
+      sceneDescLength: img.sceneDescription?.length || 0
+    }))
+  );
 
   // Upsert images into database (insert or update on conflict)
   const savedImages = await db
@@ -53,6 +64,7 @@ export async function saveImages(
         category: sql`excluded.category`,
         confidence: sql`excluded.confidence`,
         features: sql`excluded.features`,
+        sceneDescription: sql`excluded.scene_description`,
         order: sql`excluded.order`,
         metadata: sql`excluded.metadata`
       }

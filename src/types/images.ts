@@ -38,6 +38,8 @@ export interface ProcessedImage
   uploadUrl?: string;
   /** AI classification result (set after analysis) */
   classification?: RoomClassification;
+  /** Detailed scene description for video generation */
+  sceneDescription?: string;
   /** Processing status */
   status: ImageProcessingStatus;
   /** Error message if failed */
@@ -57,6 +59,7 @@ export interface SerializableImageData {
     confidence: number;
     features?: string[];
   };
+  sceneDescription?: string;
   metadata?: ImageMetadata;
 }
 

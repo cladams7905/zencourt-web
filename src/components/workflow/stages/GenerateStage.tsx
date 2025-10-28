@@ -43,7 +43,8 @@ export function GenerateStage({
     progress.steps?.some((s) => s.status === "waiting") ||
     false;
 
-  const isComplete = progress.steps?.every((s) => s.status === "completed") || false;
+  const isComplete =
+    progress.steps?.every((s) => s.status === "completed") || false;
 
   const hasFailed = progress.steps?.some((s) => s.status === "failed") || false;
 
@@ -53,7 +54,7 @@ export function GenerateStage({
       return;
     }
 
-    // Fetch video with polling every 15 seconds until we get the data
+    // Fetch video with polling every 5 seconds until we get the data
     let pollInterval: NodeJS.Timeout | null = null;
 
     const fetchVideo = async () => {
@@ -90,8 +91,8 @@ export function GenerateStage({
     // Initial fetch
     fetchVideo();
 
-    // Poll every 15 seconds
-    pollInterval = setInterval(fetchVideo, 15000);
+    // Poll every 2 seconds for faster response
+    pollInterval = setInterval(fetchVideo, 2000);
 
     // Cleanup on unmount
     return () => {
@@ -174,39 +175,16 @@ export function GenerateStage({
             </div>
           )}
 
-          {/* Generation Steps Timeline */}
-          <div className="max-w-2xl mx-auto">
-            <VerticalTimeline steps={progress.steps || []} />
-          </div>
+          {/* Generation Steps Timeline - Hide when video preview is shown */}
+          {!videoData && (
+            <div className="max-w-2xl mx-auto">
+              <VerticalTimeline steps={progress.steps || []} />
+            </div>
+          )}
 
-          {/* Success Message with Video Preview */}
+          {/* Video Preview - Show directly without success card */}
           {isComplete && (
             <div className="mt-8 space-y-6">
-              <div className="p-6 bg-green-50 border border-green-200 rounded-lg text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-green-500 text-white rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-8 h-8"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-green-900 mb-2">
-                  All Content Generated!
-                </h3>
-                <p className="text-sm text-green-700">
-                  Your video has been successfully created and is ready to preview and download.
-                </p>
-              </div>
-
-              {/* Video Preview */}
               {videoData && (
                 <div className="p-6 bg-white border border-gray-200 rounded-lg">
                   <h4 className="text-md font-semibold mb-4 flex items-center gap-2">
@@ -242,7 +220,9 @@ export function GenerateStage({
               {isLoadingVideo && (
                 <div className="p-6 bg-white border border-gray-200 rounded-lg text-center">
                   <div className="animate-spin w-8 h-8 mx-auto mb-3 border-4 border-primary border-t-transparent rounded-full"></div>
-                  <p className="text-sm text-muted-foreground">Loading video...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Loading video...
+                  </p>
                 </div>
               )}
             </div>

@@ -62,6 +62,7 @@ export interface RoomData {
   name: string;
   type: string;
   imageUrls: string[];
+  sceneDescriptions?: string[]; // Detailed descriptions from OpenAI vision
 }
 
 export interface VideoGenerationResult {
@@ -82,7 +83,9 @@ export async function startVideoGeneration(
   videoSettings: VideoSettings,
   onProgress?: (progress: VideoGenerationProgress) => void
 ): Promise<VideoGenerationResult> {
-  console.log(`[Video Generation] Starting generation for project: ${projectId}`);
+  console.log(
+    `[Video Generation] Starting generation for project: ${projectId}`
+  );
 
   try {
     // Step 1: Fetch project data and images
@@ -114,7 +117,9 @@ export async function startVideoGeneration(
     const successfulRooms = roomResults.filter((r) => r.status === "completed");
 
     if (onProgress) {
-      onProgress(buildProgressUpdate("composing_video", rooms.length, roomResults));
+      onProgress(
+        buildProgressUpdate("composing_video", rooms.length, roomResults)
+      );
     }
 
     const compositionResult = await composeFinalVideo(
@@ -131,7 +136,9 @@ export async function startVideoGeneration(
       compositionResult.duration
     );
 
-    console.log(`[Video Generation] Generation complete for project: ${projectId}`);
+    console.log(
+      `[Video Generation] Generation complete for project: ${projectId}`
+    );
 
     return {
       success: true,
@@ -168,15 +175,20 @@ async function processRoomVideos(
   videoSettings: VideoSettings,
   onProgress?: (progress: VideoGenerationProgress) => void
 ): Promise<RoomVideoResult[]> {
-  console.log(`[Video Generation] Processing ${rooms.length} rooms concurrently`);
+  console.log(
+    `[Video Generation] Processing ${rooms.length} rooms concurrently`
+  );
 
   const results: RoomVideoResult[] = [];
-  const roomRequests: Map<string, {
-    room: RoomData;
-    videoRecordId: string;
-    requestId: string;
-    submittedAt: number;
-  }> = new Map();
+  const roomRequests: Map<
+    string,
+    {
+      room: RoomData;
+      videoRecordId: string;
+      requestId: string;
+      submittedAt: number;
+    }
+  > = new Map();
 
   const startTime = Date.now();
 
@@ -204,9 +216,11 @@ async function processRoomVideos(
         roomName: room.name,
         roomType: room.type,
         images: room.imageUrls,
+        sceneDescriptions: room.sceneDescriptions,
         settings: {
           duration: videoSettings.duration,
-          aspectRatio: videoSettings.orientation === "landscape" ? "16:9" : "9:16",
+          aspectRatio:
+            videoSettings.orientation === "landscape" ? "16:9" : "9:16",
           aiDirections: videoSettings.aiDirections
         }
       };
@@ -220,9 +234,14 @@ async function processRoomVideos(
         submittedAt: Date.now()
       });
 
-      console.log(`[Video Generation] Submitted request for room: ${room.name}`);
+      console.log(
+        `[Video Generation] Submitted request for room: ${room.name}`
+      );
     } catch (error) {
-      console.error(`[Video Generation] Error submitting room ${room.name}:`, error);
+      console.error(
+        `[Video Generation] Error submitting room ${room.name}:`,
+        error
+      );
 
       // Use videoRecordId if available, otherwise generate a unique ID
       const uniqueId = videoRecordId || `failed-${room.id}-${Date.now()}`;
@@ -240,13 +259,15 @@ async function processRoomVideos(
 
   // Step 2: Wait 1 minute before starting to poll
   console.log("[Video Generation] Waiting 60 seconds before polling...");
-  await new Promise(resolve => setTimeout(resolve, 60000));
+  await new Promise((resolve) => setTimeout(resolve, 60000));
 
   // Step 3: Poll every 15 seconds until all complete
   const pendingRequests = new Set(roomRequests.keys());
 
   while (pendingRequests.size > 0) {
-    console.log(`[Video Generation] Polling ${pendingRequests.size} pending requests...`);
+    console.log(
+      `[Video Generation] Polling ${pendingRequests.size} pending requests...`
+    );
 
     for (const roomId of Array.from(pendingRequests)) {
       const requestData = roomRequests.get(roomId)!;
@@ -265,7 +286,12 @@ async function processRoomVideos(
           const videoUrl = await executeStorageWithRetry(() =>
             uploadRoomVideo(
               videoBlob,
-              { userId, projectId, videoId: requestData.videoRecordId, roomId: requestData.room.id },
+              {
+                userId,
+                projectId,
+                videoId: requestData.videoRecordId,
+                roomId: requestData.room.id
+              },
               requestData.room.name
             )
           );
@@ -283,17 +309,25 @@ async function processRoomVideos(
           });
 
           pendingRequests.delete(roomId);
-          console.log(`[Video Generation] Completed room: ${requestData.room.name}`);
+          console.log(
+            `[Video Generation] Completed room: ${requestData.room.name}`
+          );
 
           // Update progress
           if (onProgress) {
-            onProgress(buildProgressUpdate("processing_rooms", results.length, results));
+            onProgress(
+              buildProgressUpdate("processing_rooms", results.length, results)
+            );
           }
         }
       } catch (error) {
-        console.error(`[Video Generation] Error processing room ${requestData.room.name}:`, error);
+        console.error(
+          `[Video Generation] Error processing room ${requestData.room.name}:`,
+          error
+        );
 
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
         await markVideoFailed(requestData.videoRecordId, errorMessage);
 
         results.push({
@@ -309,10 +343,10 @@ async function processRoomVideos(
       }
     }
 
-    // Wait 15 seconds before next poll
+    // Wait 5 seconds before next poll
     if (pendingRequests.size > 0) {
-      console.log("[Video Generation] Waiting 15 seconds before next poll...");
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      console.log("[Video Generation] Waiting 5 seconds before next poll...");
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 
@@ -332,7 +366,9 @@ async function composeFinalVideo(
   roomResults: RoomVideoResult[],
   videoSettings: VideoSettings
 ): Promise<{ videoUrl: string; thumbnailUrl: string; duration: number }> {
-  console.log(`[Video Generation] Composing final video from ${roomResults.length} rooms`);
+  console.log(
+    `[Video Generation] Composing final video from ${roomResults.length} rooms`
+  );
 
   // Build composition settings
   const compositionSettings: VideoCompositionSettings = {
@@ -389,8 +425,13 @@ async function composeFinalVideo(
     projectName
   );
 
-  // Update final video record with URL and duration
-  await markVideoCompleted(finalVideoRecord.id, result.videoUrl);
+  // Update final video record with URL, thumbnail, and duration
+  await markVideoCompleted(
+    finalVideoRecord.id,
+    result.videoUrl,
+    result.thumbnailUrl,
+    result.duration
+  );
 
   return result;
 }
@@ -413,34 +454,42 @@ async function fetchProjectRooms(
     .where(eq(images.projectId, projectId))
     .orderBy(images.order);
 
-  // Group images by category (room type)
-  const imagesByRoom = projectImages.reduce(
-    (acc, image) => {
-      const category = image.category || "Other";
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(image.url);
-      return acc;
-    },
-    {} as Record<string, string[]>
-  );
+  // Group images by category (room type) with URLs and scene descriptions
+  const imagesByRoom = projectImages.reduce((acc, image) => {
+    const category = image.category || "Other";
+    if (!acc[category]) {
+      acc[category] = {
+        urls: [],
+        descriptions: []
+      };
+    }
+    acc[category].urls.push(image.url);
+    // Add scene description if available
+    if (image.sceneDescription) {
+      acc[category].descriptions.push(image.sceneDescription);
+    }
+    return acc;
+  }, {} as Record<string, { urls: string[]; descriptions: string[] }>);
 
   // Build room data based on roomOrder
   const rooms: RoomData[] = roomOrder
     .map((room) => {
-      const imageUrls = imagesByRoom[room.name] || [];
-      if (imageUrls.length === 0) {
+      const roomImages = imagesByRoom[room.name];
+      if (!roomImages || roomImages.urls.length === 0) {
         return null;
       }
       return {
         id: room.id,
         name: room.name,
         type: room.name, // Room name is the type
-        imageUrls
-      };
+        imageUrls: roomImages.urls,
+        sceneDescriptions:
+          roomImages.descriptions.length > 0
+            ? roomImages.descriptions
+            : undefined
+      } as RoomData;
     })
-    .filter((room): room is RoomData => room !== null);
+    .filter((room) => room !== null) as RoomData[];
 
   return rooms;
 }
@@ -462,7 +511,14 @@ function buildProgressUpdate(
     id: result.roomId,
     type: "room_video",
     label: result.roomName,
-    status: result.status === "completed" ? "completed" : result.status === "failed" ? "failed" : "in-progress",
+    status:
+      result.status === "completed"
+        ? "completed"
+        : result.status === "failed"
+        ? "failed"
+        : result.status === "processing"
+        ? "in-progress"
+        : "waiting",
     error: result.error
   }));
 
@@ -476,7 +532,7 @@ function buildProgressUpdate(
     });
   }
 
-  // Add composition step if needed
+  // Add composition step
   if (status === "composing_video") {
     steps.push({
       id: "composition",
@@ -484,18 +540,47 @@ function buildProgressUpdate(
       label: "Combining videos",
       status: "in-progress"
     });
+  } else if (status !== "completed") {
+    // Show composition as waiting if not yet started
+    steps.push({
+      id: "composition",
+      type: "composition",
+      label: "Combining videos",
+      status: "waiting"
+    });
+  } else {
+    // Show composition as completed
+    steps.push({
+      id: "composition",
+      type: "composition",
+      label: "Combining videos",
+      status: "completed"
+    });
   }
 
   const totalSteps = steps.length;
   const completedSteps = steps.filter((s) => s.status === "completed").length;
-  const overallProgress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+  const overallProgress =
+    totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
 
-  // Calculate estimated time remaining (60 seconds per room + 90 for composition)
-  const remainingRooms = steps.filter(
-    (s) => s.type === "room_video" && s.status !== "completed"
+  // Calculate estimated time remaining
+  // Total time should be around 120 seconds (2 minutes) for the entire process
+  // Break down: ~90 seconds for video generation + ~30 seconds for composition
+  const totalRooms = steps.filter((s) => s.type === "room_video").length;
+  const completedRooms = steps.filter(
+    (s) => s.type === "room_video" && s.status === "completed"
   ).length;
-  const needsComposition = status !== "completed" && !steps.some((s) => s.type === "composition" && s.status === "completed");
-  const estimatedTimeRemaining = remainingRooms * 60 + (needsComposition ? 90 : 0);
+  const remainingRooms = totalRooms - completedRooms;
+
+  const timePerRoom = 90 / Math.max(totalRooms, 1); // Distribute 90 seconds across all rooms
+  const compositionTime = 30;
+
+  const needsComposition =
+    status !== "completed" &&
+    !steps.some((s) => s.type === "composition" && s.status === "completed");
+  const estimatedTimeRemaining = Math.round(
+    remainingRooms * timePerRoom + (needsComposition ? compositionTime : 0)
+  );
 
   const currentStep = steps.find((s) => s.status === "in-progress");
 
@@ -570,7 +655,12 @@ export async function retryFailedRoomVideos(
   const roomsToRetry = allRooms.filter((room) => roomIds.includes(room.id));
 
   // Process only the failed rooms
-  return await processRoomVideos(projectId, userId, roomsToRetry, videoSettings);
+  return await processRoomVideos(
+    projectId,
+    userId,
+    roomsToRetry,
+    videoSettings
+  );
 }
 
 // ============================================================================
@@ -593,11 +683,18 @@ export async function getGenerationProgress(
     roomName: video.roomName!,
     videoUrl: video.videoUrl,
     duration: video.duration,
-    status: video.status === "completed" ? "completed" : video.status === "failed" ? "failed" : "completed",
+    status:
+      video.status === "completed"
+        ? "completed"
+        : video.status === "failed"
+        ? "failed"
+        : "processing",
     error: video.errorMessage || undefined
   }));
 
-  const completedCount = roomResults.filter((r) => r.status === "completed").length;
+  const completedCount = roomResults.filter(
+    (r) => r.status === "completed"
+  ).length;
   const status: VideoGenerationStatus = finalVideo
     ? "completed"
     : completedCount === roomResults.length && roomResults.length > 0

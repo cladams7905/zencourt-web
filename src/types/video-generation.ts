@@ -45,6 +45,7 @@ export interface RoomVideoRequest {
   roomName: string;
   roomType: string;
   images: string[]; // Image URLs
+  sceneDescriptions?: string[]; // Detailed scene descriptions from OpenAI vision for each image
   settings: {
     duration: "5" | "10";
     aspectRatio: "16:9" | "9:16" | "1:1";
@@ -58,7 +59,7 @@ export interface RoomVideoResult {
   videoUrl: string;
   thumbnailUrl?: string;
   duration: number;
-  status: "completed" | "failed";
+  status: "completed" | "failed" | "processing";
   error?: string;
 }
 
@@ -242,6 +243,7 @@ export interface PromptBuilderContext {
   roomType: string;
   aiDirections: string;
   imageCount: number;
+  sceneDescriptions?: string[]; // Detailed descriptions from OpenAI vision for each image
 }
 
 // ============================================================================

@@ -293,6 +293,209 @@ function validateClassification(classification: RoomClassification): void {
   }
 }
 
+/**
+ * Scene description prompt for video generation
+ * This prompt guides the AI to create detailed descriptions for video generation
+ */
+const SCENE_DESCRIPTION_PROMPT = `You are an expert at analyzing interior and exterior spaces for video generation. Analyze this image and provide a detailed description that will be used to generate a video walkthrough.
+
+FOCUS ON:
+1. **Spatial Layout**: Room dimensions, ceiling height, overall size and shape
+2. **Key Features**: Architectural elements, fixtures, built-ins, distinctive characteristics
+3. **Materials & Finishes**: Flooring, walls, countertops, cabinetry materials and colors
+4. **Lighting**: Natural light sources (windows, skylights), artificial lighting, ambient quality
+5. **Furnishings & Decor**: Major furniture pieces, decorative elements, style
+6. **Colors & Textures**: Dominant colors, material textures, visual patterns
+7. **Unique Elements**: Anything distinctive or noteworthy about the space
+
+REQUIREMENTS:
+- Write 3-5 detailed sentences
+- Use vivid, specific descriptions (not generic)
+- Focus on visual elements that would appear in a video
+- Describe spatial relationships and flow
+- Mention specific materials, colors, and features
+- Avoid subjective opinions or marketing language
+
+EXAMPLES:
+
+For a kitchen:
+"This modern kitchen features sleek white shaker-style cabinetry paired with warm gray quartz countertops. A large center island with waterfall edges anchors the space, topped with three industrial-style pendant lights with black metal finishes. Natural light floods through a wide picture window above the undermount stainless steel sink, illuminating the white subway tile backsplash. Stainless steel appliances including a professional-grade range complement the contemporary aesthetic. Light oak hardwood flooring extends throughout, creating warmth against the crisp white palette."
+
+For a living room:
+"This spacious living room showcases vaulted ceilings with exposed white-painted beams drawing the eye upward. Large floor-to-ceiling windows along the far wall frame views of the backyard and flood the space with natural light. The room features rich dark hardwood flooring and walls painted in a soft warm gray. A modern linear fireplace with gray stone surround serves as the focal point, flanked by built-in shelving. Contemporary furnishings include a large sectional sofa in charcoal gray facing the fireplace, with accent chairs and a glass coffee table completing the seating area."
+
+Now analyze the provided image and provide a detailed scene description:`;
+
+/**
+ * Scene description result
+ */
+export interface SceneDescription {
+  /** Detailed description of the scene for video generation */
+  description: string;
+  /** Room type that was analyzed */
+  roomType: string;
+  /** Key features detected in the scene */
+  keyFeatures: string[];
+}
+
+/**
+ * Generate a detailed scene description for video generation
+ *
+ * @param imageUrl - Public URL of the image to analyze
+ * @param roomType - Type of room being analyzed (e.g., "kitchen", "living room")
+ * @param options - Optional configuration
+ * @returns Promise<SceneDescription> - Detailed scene description
+ * @throws AIVisionError - If description generation fails
+ */
+export async function generateSceneDescription(
+  imageUrl: string,
+  roomType: string,
+  options: {
+    timeout?: number;
+    maxRetries?: number;
+  } = {}
+): Promise<SceneDescription> {
+  const { timeout = 30000, maxRetries = 2 } = options;
+
+  let lastError: Error | null = null;
+
+  // Retry logic with exponential backoff
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const client = getOpenAIClient();
+
+      // Create timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(
+            new AIVisionError(
+              `Scene description request timed out after ${timeout}ms`,
+              "TIMEOUT"
+            )
+          );
+        }, timeout);
+      });
+
+      // Create API request promise
+      const apiPromise = client.chat.completions.create({
+        model: "gpt-4o", // Using gpt-4o which supports vision
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: SCENE_DESCRIPTION_PROMPT
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: imageUrl,
+                  detail: "high" // Use high detail for better descriptions
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 800, // Allow for longer, more detailed descriptions
+        temperature: 0.7 // Slightly higher temperature for more descriptive language
+      });
+
+      // Race between API call and timeout
+      const response = await Promise.race([apiPromise, timeoutPromise]);
+
+      // Extract response
+      const content = response.choices[0]?.message?.content;
+
+      if (!content) {
+        throw new AIVisionError(
+          "No content in API response",
+          "INVALID_RESPONSE",
+          response
+        );
+      }
+
+      // Extract key features from the description
+      const keyFeatures = extractKeyFeatures(content);
+
+      return {
+        description: content.trim(),
+        roomType,
+        keyFeatures
+      };
+    } catch (error) {
+      lastError = error as Error;
+
+      // Check if it's a rate limit error
+      if (error instanceof Error && error.message.includes("rate_limit")) {
+        throw new AIVisionError(
+          "OpenAI API rate limit exceeded. Please try again later.",
+          "RATE_LIMIT",
+          error
+        );
+      }
+
+      // If this is the last retry, throw the error
+      if (attempt === maxRetries) {
+        break;
+      }
+
+      // Wait before retrying (exponential backoff)
+      const waitTime = Math.min(1000 * Math.pow(2, attempt), 5000);
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
+  }
+
+  // All retries failed, throw the last error
+  throw new AIVisionError(
+    `Failed to generate scene description after ${maxRetries + 1} attempts: ${
+      lastError?.message
+    }`,
+    "API_ERROR",
+    lastError
+  );
+}
+
+/**
+ * Extract key features from a scene description
+ * Looks for nouns and noun phrases that represent physical features
+ */
+function extractKeyFeatures(description: string): string[] {
+  // Simple extraction based on common patterns
+  // In a production system, you might use NLP for better extraction
+  const features: string[] = [];
+
+  // Common feature patterns to look for
+  const patterns = [
+    /(\w+\s+)?(?:cabinets?|cabinetry)/gi,
+    /(\w+\s+)?countertops?/gi,
+    /(\w+\s+)?flooring/gi,
+    /(\w+\s+)?windows?/gi,
+    /(\w+\s+)?lights?|lighting/gi,
+    /(\w+\s+)?ceilings?/gi,
+    /(\w+\s+)?fireplace/gi,
+    /(\w+\s+)?backsplash/gi,
+    /(\w+\s+)?island/gi,
+    /(\w+\s+)?appliances?/gi,
+    /(\w+\s+)?beams?/gi,
+    /(\w+\s+)?shelving|shelves/gi
+  ];
+
+  patterns.forEach((pattern) => {
+    const matches = description.match(pattern);
+    if (matches) {
+      matches.forEach((match) => {
+        const cleaned = match.trim().toLowerCase();
+        if (!features.includes(cleaned)) {
+          features.push(cleaned);
+        }
+      });
+    }
+  });
+
+  return features.slice(0, 10); // Limit to top 10 features
+}
+
 // ============================================================================
 // Batch Processing Functions
 // ============================================================================
@@ -575,7 +778,7 @@ export function getBatchStatistics(results: BatchClassificationResult[]) {
 // ============================================================================
 
 /**
- * AI Vision Service for room classification
+ * AI Vision Service for room classification and scene description
  */
 export const aiVisionService = {
   /**
@@ -587,6 +790,11 @@ export const aiVisionService = {
    * Classify multiple room images in batch
    */
   classifyRoomBatch,
+
+  /**
+   * Generate detailed scene description for video generation
+   */
+  generateSceneDescription,
 
   /**
    * Get statistics from batch results

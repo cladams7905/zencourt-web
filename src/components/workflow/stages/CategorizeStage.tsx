@@ -163,8 +163,18 @@ export function CategorizeStage({
             filename: img.file.name,
             uploadUrl: img.uploadUrl!,
             classification: img.classification!,
+            sceneDescription: img.sceneDescription,
             metadata: img.metadata || undefined
           }));
+
+        // Debug: Log scene descriptions before saving
+        console.log('[CategorizeStage] Images with scene descriptions:',
+          serializableImages.map(img => ({
+            id: img.id,
+            hasSceneDesc: !!img.sceneDescription,
+            sceneDescLength: img.sceneDescription?.length || 0
+          }))
+        );
 
         if (serializableImages.length > 0) {
           await saveImages(currentProject.id, serializableImages);

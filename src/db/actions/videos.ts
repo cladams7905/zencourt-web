@@ -270,18 +270,33 @@ export async function updateVideoStatus(
 export async function markVideoCompleted(
   videoId: string,
   videoUrl: string,
-  thumbnailUrl?: string
+  thumbnailUrl?: string,
+  duration?: number
 ): Promise<void> {
   try {
+    const updateData: {
+      status: string;
+      videoUrl: string;
+      thumbnailUrl: string | null;
+      errorMessage: string | null;
+      updatedAt: Date;
+      duration?: number;
+    } = {
+      status: "completed",
+      videoUrl,
+      thumbnailUrl: thumbnailUrl ?? null,
+      errorMessage: null,
+      updatedAt: new Date()
+    };
+
+    // Only update duration if provided
+    if (duration !== undefined) {
+      updateData.duration = Math.round(duration);
+    }
+
     await db
       .update(videos)
-      .set({
-        status: "completed",
-        videoUrl,
-        thumbnailUrl: thumbnailUrl ?? null,
-        errorMessage: null,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(videos.id, videoId));
 
     console.log(`Marked video as completed: ${videoId}`);

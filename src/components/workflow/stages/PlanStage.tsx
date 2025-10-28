@@ -195,13 +195,32 @@ export function PlanStage({
 }: PlanStageProps) {
   // Video configuration state
   const [orientation, setOrientation] = useState<VideoOrientation>("vertical");
-  const [roomOrder, setRoomOrder] = useState<RoomOrder[]>(
-    categorizedGroups.map((group, index) => ({
-      id: group.category || `room-${index}`,
-      name: group.category || `Room ${index + 1}`,
-      imageCount: group.images?.length || 0
-    }))
-  );
+  const [roomOrder, setRoomOrder] = useState<RoomOrder[]>(() => {
+    // Track room counts to handle duplicates (bedroom-1, bedroom-2, etc)
+    const roomCounts: Record<string, number> = {};
+
+    return categorizedGroups.map((group, index) => {
+      const category = group.category || `room-${index}`;
+      const baseName = category || `Room ${index + 1}`;
+
+      // Track how many times we've seen this room type
+      if (!roomCounts[category]) {
+        roomCounts[category] = 0;
+      }
+      roomCounts[category]++;
+
+      // Generate unique ID with suffix if there are duplicates
+      const count = roomCounts[category];
+      const uniqueId = count > 1 ? `${category}-${count}` : category;
+      const displayName = count > 1 ? `${baseName} ${count}` : baseName;
+
+      return {
+        id: uniqueId,
+        name: displayName,
+        imageCount: group.images?.length || 0
+      };
+    });
+  });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPosition, setLogoPosition] = useState<LogoPosition>("top-right");
   const [scriptText, setScriptText] = useState("");

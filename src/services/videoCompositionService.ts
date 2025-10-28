@@ -374,10 +374,8 @@ function buildTransitionFilter(videoCount: number, videoDurations: number[]): st
 
   const fadeDuration = 0.5; // 0.5 second crossfade
 
+  // Special case for 2 videos - use the proven working filter
   if (videoCount === 2) {
-    // Correct offset formula from StackOverflow:
-    // offset = previous_offset + current_video_duration - fade_duration
-    // For first transition: offset = 0 + video0_duration - fade_duration
     const offset = videoDurations[0] - fadeDuration;
 
     console.log(`[Video Composition] Building xfade filter for 2 videos`);
@@ -387,46 +385,56 @@ function buildTransitionFilter(videoCount: number, videoDurations: number[]): st
     console.log(`[Video Composition] Calculated offset: ${offset}s`);
     console.log(`[Video Composition] Expected output duration: ~${offset + videoDurations[1]}s`);
 
-    // CRITICAL: Use [0][1:v] notation (not [0:v][1:v]) for proper stream selection
-    // Also normalize both streams to same format/resolution/fps
+    // WORKING FILTER: Normalize both inputs, apply xfade, then format output
     const filter = `[0:v]format=yuv420p,fps=30,scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];[1:v]format=yuv420p,fps=30,scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];[v0][v1]xfade=transition=fade:duration=${fadeDuration}:offset=${offset},format=yuv420p[outv]`;
     console.log(`[Video Composition] Filter command: ${filter}`);
     return filter;
   }
 
-  // For 3+ videos: chain multiple xfade filters
-  // Each xfade offset is relative to its input stream
+  // For 3+ videos: try to extend the 2-video approach
+  console.log(`[Video Composition] Building xfade filter for ${videoCount} videos`);
+  console.log(`[Video Composition] Video durations:`, videoDurations);
+  console.log(`[Video Composition] Fade duration: ${fadeDuration}s`);
+
   const filters: string[] = [];
 
-  // First, normalize all inputs to same format and fps
+  // First, normalize all inputs to same format, fps, scale, and aspect ratio
   for (let i = 0; i < videoCount; i++) {
-    filters.push(`[${i}:v]format=yuv420p,fps=30[v${i}in]`);
+    filters.push(`[${i}:v]format=yuv420p,fps=30,scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1[v${i}]`);
   }
 
-  // Then chain xfade filters
+  // Chain xfade filters
   for (let i = 0; i < videoCount - 1; i++) {
+    const isFirst = i === 0;
     const isLast = i === videoCount - 2;
-    const outputLabel = isLast ? "outv" : `v${i}out`;
 
+    const input1 = isFirst ? `v${i}` : `xf${i - 1}`;
+    const input2 = `v${i + 1}`;
+    const output = isLast ? "outv" : `xf${i}`;
+
+    // Offset calculation
     let offset: number;
-    if (i === 0) {
+    if (isFirst) {
       offset = videoDurations[0] - fadeDuration;
     } else {
-      // For chained xfades, each subsequent offset is relative to the combined output
-      const previousOutputDuration = videoDurations.slice(0, i + 1).reduce((a, b) => a + b, 0) - (i * fadeDuration);
-      offset = previousOutputDuration - fadeDuration;
+      // For chained xfades, calculate accumulated duration
+      const accumulatedDuration = videoDurations.slice(0, i + 1).reduce((a, b) => a + b, 0) - (i * fadeDuration);
+      offset = accumulatedDuration - fadeDuration;
     }
 
-    console.log(`[Video Composition] Video ${i} -> ${i+1} xfade offset: ${offset}s`);
+    console.log(`[Video Composition] Xfade ${i}: [${input1}][${input2}] -> [${output}], offset: ${offset}s`);
 
-    if (i === 0) {
-      filters.push(`[v0in][v1in]xfade=transition=fade:duration=${fadeDuration}:offset=${offset}[${outputLabel}]`);
+    // For the last xfade, add format=yuv420p like in the 2-video case
+    if (isLast) {
+      filters.push(`[${input1}][${input2}]xfade=transition=fade:duration=${fadeDuration}:offset=${offset},format=yuv420p[${output}]`);
     } else {
-      filters.push(`[v${i - 1}out][v${i + 1}in]xfade=transition=fade:duration=${fadeDuration}:offset=${offset}[${outputLabel}]`);
+      filters.push(`[${input1}][${input2}]xfade=transition=fade:duration=${fadeDuration}:offset=${offset}[${output}]`);
     }
   }
 
-  return filters.join(";");
+  const finalFilter = filters.join(";");
+  console.log(`[Video Composition] Complete filter: ${finalFilter}`);
+  return finalFilter;
 }
 
 // ============================================================================
@@ -674,7 +682,7 @@ async function getVideoDuration(videoPath: string): Promise<number> {
 /**
  * Get full video metadata
  */
-async function getVideoMetadata(videoPath: string): Promise<any> {
+async function getVideoMetadata(videoPath: string): Promise<import("fluent-ffmpeg").FfprobeData> {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(videoPath, (err, metadata) => {
       if (err) {
