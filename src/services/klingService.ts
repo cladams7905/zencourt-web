@@ -223,10 +223,7 @@ export async function getRoomVideoResult(
  * Select the best images for video generation (up to maxCount)
  * Prioritizes images with higher confidence scores
  */
-export function selectBestImages(
-  imageUrls: string[],
-  maxCount: number = 4
-): string[] {
+function selectBestImages(imageUrls: string[], maxCount: number = 4): string[] {
   if (imageUrls.length === 0) {
     return [];
   }
@@ -244,7 +241,7 @@ export function selectBestImages(
 /**
  * Select best images from ProcessedImage array
  */
-export function selectBestImagesFromProcessed(
+function selectBestImagesFromProcessed(
   images: ProcessedImage[],
   maxCount: number = 4
 ): ImageSelectionResult {
@@ -293,7 +290,7 @@ export function selectBestImagesFromProcessed(
 /**
  * Build a detailed prompt incorporating scene descriptions from OpenAI vision
  */
-export function buildKlingPrompt(context: PromptBuilderContext): string {
+function buildKlingPrompt(context: PromptBuilderContext): string {
   const { roomType, aiDirections, sceneDescriptions } = context;
 
   // Start with base camera movement instruction
@@ -405,4 +402,4 @@ function createError(
 // Export Configuration
 // ============================================================================
 
-export const klingConfig = DEFAULT_CONFIG;
+const klingConfig = DEFAULT_CONFIG;
