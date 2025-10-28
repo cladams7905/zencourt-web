@@ -3,6 +3,7 @@
  *
  * Handles all interactions with the Kling AI video generation API via fal.ai
  */
+"use server";
 
 import * as fal from "@fal-ai/serverless-client";
 import type {
@@ -36,7 +37,10 @@ function ensureFalConfigured(): string {
 
   if (!apiKey) {
     console.error("[Kling Service] FAL_KEY environment variable is not set");
-    console.error("[Kling Service] Available env vars:", Object.keys(process.env).filter(k => k.startsWith('FAL')));
+    console.error(
+      "[Kling Service] Available env vars:",
+      Object.keys(process.env).filter((k) => k.startsWith("FAL"))
+    );
     throw new Error("FAL_KEY environment variable is not set");
   }
 
@@ -96,7 +100,7 @@ export async function submitRoomVideoGeneration(
       `[Kling API] Submitting video generation for room: ${roomData.roomName} with ${selectedImages.length} images`
     );
     console.log(`[Kling API] Request payload:`, {
-      prompt: prompt.substring(0, 100) + '...',
+      prompt: prompt.substring(0, 100) + "...",
       imageCount: selectedImages.length,
       duration: request.duration,
       aspectRatio: request.aspect_ratio
@@ -299,8 +303,8 @@ export function buildKlingPrompt(context: PromptBuilderContext): string {
   if (sceneDescriptions && sceneDescriptions.length > 0) {
     // Combine scene descriptions into a comprehensive description
     const detailedDescription = sceneDescriptions
-      .filter(desc => desc && desc.trim().length > 0)
-      .join(' ');
+      .filter((desc) => desc && desc.trim().length > 0)
+      .join(" ");
 
     if (detailedDescription) {
       prompt += ` ${detailedDescription}`;
@@ -317,11 +321,16 @@ export function buildKlingPrompt(context: PromptBuilderContext): string {
 
   // Ensure prompt doesn't exceed max length (2500 chars)
   if (prompt.length > 2500) {
-    console.warn(`[Kling Prompt] Prompt exceeded 2500 chars (${prompt.length}), truncating...`);
+    console.warn(
+      `[Kling Prompt] Prompt exceeded 2500 chars (${prompt.length}), truncating...`
+    );
     prompt = prompt.substring(0, 2497) + "...";
   }
 
-  console.log(`[Kling Prompt] Generated prompt (${prompt.length} chars):`, prompt);
+  console.log(
+    `[Kling Prompt] Generated prompt (${prompt.length} chars):`,
+    prompt
+  );
 
   return prompt;
 }
