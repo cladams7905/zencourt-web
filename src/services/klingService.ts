@@ -21,17 +21,32 @@ import type { ProcessedImage } from "@/types/images";
 // ============================================================================
 
 const DEFAULT_CONFIG: KlingServiceConfig = {
-  apiKey: process.env.FAL_KEY || "",
+  apiKey: "", // Will be loaded dynamically
   maxRetries: 3,
   timeoutMs: 60000, // 60 seconds
   concurrentRequests: 3
 };
 
-// Configure fal.ai client
-if (DEFAULT_CONFIG.apiKey) {
+/**
+ * Get API key and ensure fal.ai client is configured
+ * This is called on each request to ensure env vars are loaded in serverless environments
+ */
+function ensureFalConfigured(): string {
+  const apiKey = process.env.FAL_KEY || "";
+
+  if (!apiKey) {
+    console.error("[Kling Service] FAL_KEY environment variable is not set");
+    console.error("[Kling Service] Available env vars:", Object.keys(process.env).filter(k => k.startsWith('FAL')));
+    throw new Error("FAL_KEY environment variable is not set");
+  }
+
+  // Configure fal.ai client with the current API key
   fal.config({
-    credentials: DEFAULT_CONFIG.apiKey
+    credentials: apiKey
   });
+
+  console.log("[Kling Service] FAL client configured successfully");
+  return apiKey;
 }
 
 // ============================================================================
@@ -45,13 +60,9 @@ export async function submitRoomVideoGeneration(
   roomData: RoomVideoRequest
 ): Promise<string> {
   try {
-    // Validate API key
-    if (!DEFAULT_CONFIG.apiKey) {
-      throw createError(
-        "FAL_KEY environment variable is not set",
-        "KLING_API_ERROR"
-      );
-    }
+    // Ensure fal.ai client is configured with API key
+    console.log("[Kling Service] Ensuring FAL client is configured...");
+    ensureFalConfigured();
 
     // Select best images (up to 4 for elements endpoint)
     const selectedImages = selectBestImages(roomData.images, 4);
@@ -84,6 +95,12 @@ export async function submitRoomVideoGeneration(
     console.log(
       `[Kling API] Submitting video generation for room: ${roomData.roomName} with ${selectedImages.length} images`
     );
+    console.log(`[Kling API] Request payload:`, {
+      prompt: prompt.substring(0, 100) + '...',
+      imageCount: selectedImages.length,
+      duration: request.duration,
+      aspectRatio: request.aspect_ratio
+    });
 
     // Submit to queue (non-blocking)
     const { request_id } = await fal.queue.submit(
@@ -92,7 +109,7 @@ export async function submitRoomVideoGeneration(
     );
 
     console.log(
-      `[Kling API] Submitted request for room ${roomData.roomName}, requestId: ${request_id}`
+      `[Kling API] ✓ Successfully submitted request for room ${roomData.roomName}, requestId: ${request_id}`
     );
 
     return request_id;
@@ -112,6 +129,9 @@ export async function pollRoomVideoStatus(
   requestId: string
 ): Promise<{ status: string; completed: boolean }> {
   try {
+    // Ensure fal.ai client is configured
+    ensureFalConfigured();
+
     const status = await fal.queue.status(
       "fal-ai/kling-video/v1.6/standard/elements",
       { requestId, logs: true }
@@ -137,6 +157,9 @@ export async function getRoomVideoResult(
   requestId: string
 ): Promise<KlingApiResponse> {
   try {
+    // Ensure fal.ai client is configured
+    ensureFalConfigured();
+
     const result = (await fal.queue.result(
       "fal-ai/kling-video/v1.6/standard/elements",
       { requestId }
