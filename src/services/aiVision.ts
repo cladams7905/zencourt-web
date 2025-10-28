@@ -295,36 +295,27 @@ function validateClassification(classification: RoomClassification): void {
 
 /**
  * Scene description prompt for video generation
- * This prompt guides the AI to create detailed descriptions for video generation
+ * This prompt guides the AI to create SHORT, concise descriptions for video generation
  */
-const SCENE_DESCRIPTION_PROMPT = `You are an expert at analyzing interior and exterior spaces for video generation. Analyze this image and provide a detailed description that will be used to generate a video walkthrough.
+const SCENE_DESCRIPTION_PROMPT = `You are an expert at analyzing interior and exterior spaces for video generation. Analyze this image and provide a SHORT, CONCISE description that will be used to generate a video walkthrough.
 
-FOCUS ON:
-1. **Spatial Layout**: Room dimensions, ceiling height, overall size and shape
-2. **Key Features**: Architectural elements, fixtures, built-ins, distinctive characteristics
-3. **Materials & Finishes**: Flooring, walls, countertops, cabinetry materials and colors
-4. **Lighting**: Natural light sources (windows, skylights), artificial lighting, ambient quality
-5. **Furnishings & Decor**: Major furniture pieces, decorative elements, style
-6. **Colors & Textures**: Dominant colors, material textures, visual patterns
-7. **Unique Elements**: Anything distinctive or noteworthy about the space
-
-REQUIREMENTS:
-- Write 3-5 detailed sentences
-- Use vivid, specific descriptions (not generic)
-- Focus on visual elements that would appear in a video
-- Describe spatial relationships and flow
-- Mention specific materials, colors, and features
-- Avoid subjective opinions or marketing language
+CRITICAL REQUIREMENTS:
+- Write ONLY 1-2 SHORT sentences (maximum 30-40 words total)
+- Be specific but extremely concise
+- Focus on the most visually distinctive elements
+- Mention key features: layout, materials, colors, lighting
+- Avoid unnecessary details or marketing language
+- Keep it brief and direct
 
 EXAMPLES:
 
 For a kitchen:
-"This modern kitchen features sleek white shaker-style cabinetry paired with warm gray quartz countertops. A large center island with waterfall edges anchors the space, topped with three industrial-style pendant lights with black metal finishes. Natural light floods through a wide picture window above the undermount stainless steel sink, illuminating the white subway tile backsplash. Stainless steel appliances including a professional-grade range complement the contemporary aesthetic. Light oak hardwood flooring extends throughout, creating warmth against the crisp white palette."
+"Modern white kitchen with gray quartz countertops and a large center island. Stainless appliances and subway tile backsplash with natural light from a window above the sink."
 
 For a living room:
-"This spacious living room showcases vaulted ceilings with exposed white-painted beams drawing the eye upward. Large floor-to-ceiling windows along the far wall frame views of the backyard and flood the space with natural light. The room features rich dark hardwood flooring and walls painted in a soft warm gray. A modern linear fireplace with gray stone surround serves as the focal point, flanked by built-in shelving. Contemporary furnishings include a large sectional sofa in charcoal gray facing the fireplace, with accent chairs and a glass coffee table completing the seating area."
+"Spacious living room with vaulted ceilings, dark hardwood floors, and floor-to-ceiling windows. Modern linear fireplace with gray stone surround and charcoal sectional sofa."
 
-Now analyze the provided image and provide a detailed scene description:`;
+Now analyze the provided image and provide a SHORT, CONCISE scene description (1-2 sentences max):`;
 
 /**
  * Scene description result
@@ -397,7 +388,7 @@ export async function generateSceneDescription(
             ]
           }
         ],
-        max_tokens: 800, // Allow for longer, more detailed descriptions
+        max_tokens: 150, // Limit to keep descriptions short (1-2 sentences)
         temperature: 0.7 // Slightly higher temperature for more descriptive language
       });
 

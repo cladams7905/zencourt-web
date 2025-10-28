@@ -124,14 +124,32 @@ export function GenerateStage({
     onCancel?.();
   };
 
-  const handleDownloadVideo = () => {
+  const handleDownloadVideo = async () => {
     if (videoData?.videoUrl) {
-      const link = document.createElement("a");
-      link.href = videoData.videoUrl;
-      link.download = `video-${projectId}.mp4`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      try {
+        // Fetch the video as a blob to handle cross-origin URLs properly
+        const response = await fetch(videoData.videoUrl);
+        if (!response.ok) {
+          throw new Error('Failed to fetch video');
+        }
+
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = `video-${projectId}.mp4`;
+        document.body.appendChild(link);
+        link.click();
+
+        // Clean up
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (error) {
+        console.error('Failed to download video:', error);
+        // Fallback to direct link if fetch fails
+        window.open(videoData.videoUrl, '_blank');
+      }
     }
   };
 
